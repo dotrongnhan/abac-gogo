@@ -18,6 +18,40 @@
       }
     },
     {
+      "id": "res-001-financial",
+      "resource_type": "api_endpoint", 
+      "resource_id": "/api/v1/financial",
+      "path": "api.v1.financial",
+      "metadata": {
+        "description": "Financial data API",
+        "version": "v1"
+      },
+      "attributes": {
+        "data_classification": "highly_confidential",
+        "methods": ["GET"],
+        "rate_limit": 100,
+        "requires_auth": true,
+        "department": "finance"
+      }
+    },
+    {
+      "id": "res-001-admin",
+      "resource_type": "api_endpoint",
+      "resource_id": "/api/v1/admin", 
+      "path": "api.v1.admin",
+      "metadata": {
+        "description": "Admin panel API",
+        "version": "v1"
+      },
+      "attributes": {
+        "data_classification": "highly_confidential",
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "rate_limit": 50,
+        "requires_auth": true,
+        "admin_only": true
+      }
+    },
+    {
       "id": "res-002",
       "resource_type": "database",
       "resource_id": "prod-db-customers",

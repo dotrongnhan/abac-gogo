@@ -161,6 +161,12 @@ func (s *MockStorage) GetSubject(id string) (*models.Subject, error) {
 func (s *MockStorage) GetResource(id string) (*models.Resource, error) {
 	resource, exists := s.resources[id]
 	if !exists {
+		// Try to find by ResourceID (path) if not found by ID
+		for _, res := range s.resources {
+			if res.ResourceID == id {
+				return &res, nil
+			}
+		}
 		return nil, fmt.Errorf("resource not found: %s", id)
 	}
 	return &resource, nil
