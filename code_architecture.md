@@ -1,271 +1,516 @@
-Dựa trên các file thông tin bạn cung cấp, tôi sẽ giải thích cách thiết kế code cho ABAC system với PostgreSQL database và GORM ORM, cùng với fallback mock data từ JSON:
+# Code Architecture - ABAC HTTP Service
 
-## **Thiết kế Code Architecture**
+Tài liệu kiến trúc chi tiết của ABAC HTTP Service đơn giản.
 
-### **1. Package Structure**
+## 🏗️ Tổng Quan Kiến Trúc
+
+### High-Level Architecture
+
 ```
-abac/
-├── models/          # Data models với GORM tags
-├── evaluator/       # PDP - Policy Decision Point
-├── attributes/      # PIP - Policy Information Point  
-├── operators/       # Rule operators (eq, in, regex...)
-├── storage/         # Dual storage implementation
-│   ├── postgresql_storage.go  # Production PostgreSQL với GORM
-│   ├── mock_storage.go       # Development JSON mock
-│   └── database.go           # Database connection management
-├── audit/          # Audit logging
-├── cmd/            # CLI tools
-│   └── migrate/    # Database migration và seeding
-├── docker-compose.yml # PostgreSQL development environment
-└── main.go
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   HTTP Client   │───▶│  ABAC Service   │───▶│   Data Layer    │
+│                 │    │                 │    │                 │
+│ • Web Browser   │    │ • HTTP Server   │    │ • JSON Files    │
+│ • Mobile App    │    │ • ABAC Middleware│    │ • Mock Storage  │
+│ • API Client    │    │ • REST Endpoints│    │ • Policies      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### **2. Core Components Design**
+### ABAC Components Integration
 
-#### **2.1 Models Package với GORM Support**
-- **Subject, Resource, Action, Policy** structs với GORM tags cho auto-migration
-- **Custom JSONB Types**: `JSONMap`, `JSONStringSlice`, `JSONPolicyRules` cho PostgreSQL JSONB storage
-- **Database Timestamps**: Auto-managed `created_at`, `updated_at` fields
-- **Indexes**: Optimized database indexes cho performance
-
-#### **2.2 Storage Package (Dual Implementation)**
-``` go
-type Storage interface {
-    GetSubject(id string) (*Subject, error)
-    GetResource(id string) (*Resource, error)
-    GetPolicies() ([]*Policy, error)
-    GetAction(name string) (*Action, error)
-}
-
-// PostgreSQL Implementation (Production)
-type PostgreSQLStorage struct {
-    db *gorm.DB
-}
-
-// Mock Implementation (Development/Testing)
-type MockStorage struct {
-    subjects  map[string]Subject   // Load từ subjects.json (values, not pointers)
-    resources map[string]Resource  // Load từ resources.json (values, not pointers)
-    policies  []*Policy            // Load từ policies.json (still pointers)
-    actions   map[string]Action    // Load từ actions.json (values, not pointers)
-}
+```
+HTTP Request
+     │
+     ▼
+┌─────────────────┐
+│ HTTP Middleware │ ◄── PEP (Policy Enforcement Point)
+│ (ABAC Auth)     │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ Policy Decision │ ◄── PDP (Policy Decision Point)  
+│ Point           │
+└─────────┬───────┘
+          │
+          ├─────────────────┐
+          │                 │
+          ▼                 ▼
+┌─────────────────┐ ┌─────────────────┐
+│ Attribute       │ │ Policy Admin    │
+│ Resolver        │ │ Point           │
+│ (PIP)           │ │ (PAP)           │
+└─────────────────┘ └─────────────────┘
 ```
 
-**PostgreSQL Storage Features:**
-- GORM ORM với connection pooling
-- Auto-migration cho schema updates
-- JSONB support cho complex attributes
-- Optimized queries với proper indexing
-- Transaction support cho data consistency
+## 📁 Project Structure
 
-#### **2.3 Evaluator Package (PDP)**
-**Main flow:**
-1. **FilterApplicablePolicies**: Lọc policies phù hợp với request
-2. **SortByPriority**: Sắp xếp theo priority (ascending)
-3. **EvaluatePolicies**: Loop qua từng policy
-4. **ShortCircuit**: Dừng ngay khi gặp DENY
-5. **ReturnDecision**: Trả về quyết định cuối cùng
+```
+ABAC-gogo-example/
+├── main.go                     # 🚀 HTTP Server + ABAC Middleware
+├── go.mod                      # Go modules
+├── go.sum                      # Dependencies
+│
+├── 📊 Data Files (JSON)
+│   ├── subjects.json           # Users và attributes
+│   ├── resources.json          # API endpoints và properties  
+│   ├── actions.json            # Available actions
+│   └── policies.json           # ABAC policies và rules
+│
+├── 📚 Documentation
+│   ├── README.md               # Quick start guide
+│   ├── API_DOCUMENTATION.md    # API endpoints chi tiết
+│   ├── code_architecture.md    # Tài liệu này
+│   └── ABAC_SYSTEM_DOCUMENTATION.md
+│
+└── 🔧 Core Packages
+    ├── models/                 # Data structures
+    │   ├── types.go           # Core ABAC types
+    │   └── types_test.go      # Model tests
+    │
+    ├── evaluator/             # PDP Implementation
+    │   ├── pdp.go            # Policy evaluation engine
+    │   └── pdp_test.go       # PDP tests
+    │
+    ├── attributes/            # PIP Implementation  
+    │   ├── resolver.go       # Attribute resolution
+    │   └── resolver_test.go  # Attribute tests
+    │
+    ├── storage/               # PAP Implementation
+    │   ├── mock_storage.go   # JSON-based storage
+    │   ├── mock_storage_test.go
+    │   └── postgresql_storage.go # Database storage
+    │
+    ├── operators/             # Rule Operators
+    │   ├── operators.go      # Comparison operators
+    │   └── operators_test.go # Operator tests
+    │
+    ├── audit/                 # Audit Logging
+    │   ├── logger.go         # Audit trail
+    │   └── logger_test.go    # Audit tests
+    │
+    └── pep/                   # PEP Components (Legacy)
+        ├── core.go           # Advanced PEP features
+        ├── middleware.go     # HTTP middleware
+        └── ...               # Other PEP components
+```
 
-**Key methods:**
-- `Evaluate(request *EvaluationRequest) *Decision`
-- `matchResourcePattern(pattern, resource string) bool`
-- `evaluateRules(policy *Policy, context *Context) bool`
+## 🔄 Request Flow Architecture
 
-#### **2.4 Attributes Package (PIP) - Enhanced for GORM**
+### 1. HTTP Request Processing
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant HTTPServer
+    participant ABACMiddleware
+    participant PDP
+    participant PIP
+    participant PAP
+    participant Handler
+
+    Client->>HTTPServer: HTTP Request + X-Subject-ID
+    HTTPServer->>ABACMiddleware: Route to protected endpoint
+    
+    ABACMiddleware->>ABACMiddleware: Extract Subject, Resource, Action
+    ABACMiddleware->>PDP: Evaluate(request)
+    
+    PDP->>PIP: EnrichContext(request)
+    PIP->>PAP: GetSubject(subjectID)
+    PIP->>PAP: GetResource(resourceID) 
+    PIP->>PAP: GetAction(action)
+    PAP-->>PIP: Return entities
+    PIP-->>PDP: Return enriched context
+    
+    PDP->>PAP: GetPolicies()
+    PAP-->>PDP: Return policies
+    PDP->>PDP: Evaluate policies against context
+    PDP-->>ABACMiddleware: Return decision (PERMIT/DENY)
+    
+    alt Decision = PERMIT
+        ABACMiddleware->>Handler: Forward request
+        Handler-->>Client: Business logic response
+    else Decision = DENY
+        ABACMiddleware-->>Client: 403 Forbidden + reason
+    end
+```
+
+### 2. Component Interaction
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    main.go (HTTP Server)                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────┐    ┌─────────────────┐                │
+│  │ CORS Middleware │───▶│ ABAC Middleware │                │
+│  └─────────────────┘    └─────────┬───────┘                │
+│                                   │                        │
+│  ┌─────────────────────────────────▼───────────────────┐    │
+│  │              ABACService                           │    │
+│  │  ┌─────────────────┐  ┌─────────────────┐          │    │
+│  │  │       PDP       │  │     Storage     │          │    │
+│  │  │   (evaluator)   │  │  (mock/postgres)│          │    │
+│  │  └─────────────────┘  └─────────────────┘          │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐  │
+│  │ Users Handler   │  │Financial Handler│  │Admin Handler│  │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 🧩 Core Components Detail
+
+### 1. HTTP Server (main.go)
+
 **Responsibilities:**
-- Resolve subject attributes từ database hoặc mock data
-- Handle GORM custom types (`JSONMap`, `JSONStringSlice`)
-- Resolve resource attributes với JSONB queries
-- Enrich environment context
-- Handle temporal attributes (valid_from/valid_until)
-- Process inherited attributes cho hierarchical resources
+- HTTP server setup và routing
+- CORS handling
+- Graceful shutdown
+- Service initialization
 
-**Key methods:**
-- `GetSubjectAttributes(subjectID string) map[string]interface{}`
-- `GetResourceAttributes(resourceID string) map[string]interface{}`
-- `EnrichContext(request *EvaluationRequest) *Context`
-- `ResolveHierarchy(resourcePath string) []string`
-- `GetAttributeValue(target interface{}, path string) interface{}` - **Updated để handle JSONMap**
+**Key Functions:**
+```go
+func main()                                    // Server entry point
+func (service *ABACService) ABACMiddleware()   // ABAC authorization middleware
+func handleUsers()                             // Business logic handlers
+func handleFinancialData()
+func handleAdminPanel()
+```
 
-#### **2.5 Operators Package**
-Implement các operator cho rule evaluation:
-- **eq**: So sánh bằng
-- **in**: Giá trị trong array
-- **contains**: Array chứa giá trị
-- **regex**: Pattern matching
-- **between**: Range check
-- **gte/lte**: So sánh lớn hơn/nhỏ hơn
+**Dependencies:**
+- `evaluator.PolicyDecisionPoint` (PDP)
+- `storage.Storage` (PAP/PIP)
 
-**Interface design:**
-``` go
-type Operator interface {
-    Evaluate(actual, expected interface{}) bool
+### 2. ABAC Middleware
+
+**Flow:**
+```go
+func (service *ABACService) ABACMiddleware(requiredAction string) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            // 1. Extract subject từ X-Subject-ID header
+            subjectID := r.Header.Get("X-Subject-ID")
+            
+            // 2. Create evaluation request
+            request := &models.EvaluationRequest{
+                SubjectID:  subjectID,
+                ResourceID: r.URL.Path,        // Resource = URL path
+                Action:     requiredAction,    // Action = required permission
+                Context:    map[string]interface{}{...}
+            }
+            
+            // 3. Call PDP để evaluate
+            decision, err := service.pdp.Evaluate(request)
+            
+            // 4. Enforce decision
+            if decision.Result != "permit" {
+                // Return 403 Forbidden
+                return
+            }
+            
+            // 5. Allow request to continue
+            next.ServeHTTP(w, r)
+        })
+    }
 }
 ```
 
-### **3. Database Setup & Migration**
+### 3. Policy Decision Point (PDP)
 
-#### **Step 1: Environment Setup**
-```bash
-# Start PostgreSQL với Docker Compose
-docker-compose up -d
+**Location:** `evaluator/pdp.go`
 
-# Set environment variables
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DB_NAME=abac_system
+**Core Method:**
+```go
+func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*models.Decision, error) {
+    // 1. Enrich context với PIP
+    context, err := pdp.attributeResolver.EnrichContext(request)
+    
+    // 2. Get policies từ PAP
+    allPolicies, err := pdp.storage.GetPolicies()
+    
+    // 3. Filter applicable policies
+    applicablePolicies := pdp.filterApplicablePolicies(allPolicies, context)
+    
+    // 4. Sort by priority
+    sort.Slice(applicablePolicies, func(i, j int) bool {
+        return applicablePolicies[i].Priority < applicablePolicies[j].Priority
+    })
+    
+    // 5. Evaluate policies với short-circuit logic
+    decision := pdp.evaluatePolicies(applicablePolicies, context)
+    
+    return decision, nil
+}
 ```
 
-#### **Step 2: Migration & Seeding**
+**Decision Logic:**
+- **DENY overrides everything** - Short circuit nếu có DENY policy match
+- **PERMIT requires match** - Cần ít nhất 1 PERMIT policy match
+- **NOT_APPLICABLE** - Không có policy nào applicable
+
+### 4. Policy Information Point (PIP)
+
+**Location:** `attributes/resolver.go`
+
+**Core Method:**
+```go
+func (resolver *AttributeResolver) EnrichContext(request *models.EvaluationRequest) (*models.EvaluationContext, error) {
+    // 1. Get subject attributes
+    subject, err := resolver.storage.GetSubject(request.SubjectID)
+    
+    // 2. Get resource attributes  
+    resource, err := resolver.storage.GetResource(request.ResourceID)
+    
+    // 3. Get action attributes
+    action, err := resolver.storage.GetAction(request.Action)
+    
+    // 4. Compute environment attributes
+    environment := resolver.computeEnvironmentAttributes(request.Context)
+    
+    // 5. Return enriched context
+    return &models.EvaluationContext{
+        Subject:     subject,
+        Resource:    resource, 
+        Action:      action,
+        Environment: environment,
+    }, nil
+}
+```
+
+### 5. Policy Administration Point (PAP)
+
+**Location:** `storage/mock_storage.go`
+
+**Key Methods:**
+```go
+func (s *MockStorage) GetSubject(id string) (*models.Subject, error)
+func (s *MockStorage) GetResource(id string) (*models.Resource, error)  
+func (s *MockStorage) GetAction(name string) (*models.Action, error)
+func (s *MockStorage) GetPolicies() ([]*models.Policy, error)
+```
+
+**Data Loading:**
+```go
+func NewMockStorage(dataDir string) (*MockStorage, error) {
+    // Load subjects.json → s.subjects map
+    // Load resources.json → s.resources map  
+    // Load actions.json → s.actions map
+    // Load policies.json → s.policies slice
+}
+```
+
+## 📊 Data Models
+
+### Core ABAC Types
+
+```go
+// Evaluation Request
+type EvaluationRequest struct {
+    RequestID  string                 `json:"request_id"`
+    SubjectID  string                 `json:"subject_id"`   // From X-Subject-ID header
+    ResourceID string                 `json:"resource_id"`  // From URL path
+    Action     string                 `json:"action"`       // Required permission
+    Context    map[string]interface{} `json:"context"`      // Additional context
+}
+
+// Evaluation Context (Enriched)
+type EvaluationContext struct {
+    Subject     *Subject               `json:"subject"`
+    Resource    *Resource              `json:"resource"`
+    Action      *Action                `json:"action"`
+    Environment map[string]interface{} `json:"environment"`
+    Timestamp   time.Time              `json:"timestamp"`
+}
+
+// Decision Result
+type Decision struct {
+    Result           string   `json:"result"`            // permit/deny/not_applicable
+    MatchedPolicies  []string `json:"matched_policies"`  // IDs của policies matched
+    EvaluationTimeMs int      `json:"evaluation_time_ms"`
+    Reason          string   `json:"reason"`             // Human-readable reason
+}
+```
+
+### Entity Models
+
+```go
+// Subject (User/Service)
+type Subject struct {
+    ID          string                 `json:"id"`           // sub-001
+    ExternalID  string                 `json:"external_id"`  // john.doe@company.com
+    SubjectType string                 `json:"subject_type"` // user/service
+    Attributes  map[string]interface{} `json:"attributes"`   // department, role, clearance_level
+}
+
+// Resource (API Endpoint/Data)
+type Resource struct {
+    ID           string                 `json:"id"`           // res-001
+    ResourceType string                 `json:"resource_type"` // api_endpoint
+    ResourceID   string                 `json:"resource_id"`   // /api/v1/users
+    Path         string                 `json:"path"`          // api.v1.users
+    Attributes   map[string]interface{} `json:"attributes"`    // data_classification, methods
+}
+
+// Policy
+type Policy struct {
+    ID               string        `json:"id"`                // pol-001
+    PolicyName       string        `json:"policy_name"`       // Engineering Read Access
+    Effect           string        `json:"effect"`            // permit/deny
+    Priority         int           `json:"priority"`          // Lower = higher priority
+    Enabled          bool          `json:"enabled"`
+    Rules            []PolicyRule  `json:"rules"`             // AND logic
+    Actions          []string      `json:"actions"`           // Applicable actions
+    ResourcePatterns []string      `json:"resource_patterns"` // Resource matching
+}
+
+// Policy Rule
+type PolicyRule struct {
+    TargetType     string      `json:"target_type"`     // subject/resource/action/environment
+    AttributePath  string      `json:"attribute_path"`  // attributes.department
+    Operator       string      `json:"operator"`        // eq/in/contains/gt/lt
+    ExpectedValue  interface{} `json:"expected_value"`  // "engineering"
+    IsNegative     bool        `json:"is_negative"`     // NOT logic
+}
+```
+
+## 🔧 Configuration & Deployment
+
+### Environment Setup
+
 ```bash
-# Install dependencies
-go mod tidy
-
-# Run database migration và seed data từ JSON files
-go run cmd/migrate/main.go
-
-# Run application với PostgreSQL
+# Development
 go run main.go
+
+# Production Build
+go build -o abac-service main.go
+./abac-service
+
+# Docker
+docker build -t abac-service .
+docker run -p 8081:8081 abac-service
 ```
 
-#### **Step 3: Development Workflow**
-- **Production**: Sử dụng PostgreSQL với environment variables
-- **Development**: Fallback to JSON mock data nếu database không available
-- **Testing**: Isolated test database hoặc in-memory SQLite
+### Configuration Files
 
-### **4. Evaluation Logic Flow (Updated for Database)**
-
-#### **Step 1: Load Request Context**
-- Parse evaluation request
-- Fetch subject từ PostgreSQL/mock storage với GORM queries
-- Fetch resource từ PostgreSQL/mock storage
-- Handle JSONB attributes conversion
-- Enrich environment context (time, IP, location)
-
-#### **Step 2: Filter Policies**
-- Match resource patterns (support wildcards)
-- Match actions
-- Check enabled = true
-- Build policy candidate list
-
-#### **Step 3: Evaluate Each Policy**
-- Sort by priority (low to high)
-- For each policy:
-    - Evaluate ALL rules (AND logic)
-    - Check subject rules
-    - Check resource rules
-    - Check environment rules
-    - If all match → Apply effect
-
-#### **Step 4: Conflict Resolution**
-- DENY overrides PERMIT
-- First DENY → Return DENY immediately
-- No DENY + Has PERMIT → Return PERMIT
-- No match → Return NOT_APPLICABLE
-
-### **4. Special Cases Handling**
-
-#### **4.1 Hierarchical Resources**
-- Parse resource path (e.g., `/api/v1/users/123`)
-- Generate parent paths
-- Check policies với `is_recursive` flag
-- Accumulate permissions từ parent
-
-#### **4.2 Multi-value Attributes**
-- Role là array → Use "contains" operator
-- Check "any of" vs "all of" logic
-- Handle type mismatches gracefully
-
-#### **4.3 Time-based Access**
-- Parse `time_of_day` từ timestamp
-- Compare với business hours range
-- Check `valid_from/valid_until` cho temporal attrs
-
-#### **4.4 Wildcard Patterns**
-- Support `*` wildcard (e.g., `/api/v1/*`)
-- Convert to regex for matching
-- Cache compiled regex patterns
-
-### **5. Performance Optimizations (Database-Aware)**
-
-#### **5.1 Database Indexing**
-```sql
--- Auto-generated indexes từ GORM tags
-CREATE INDEX idx_subjects_external_id ON subjects(external_id);
-CREATE INDEX idx_subjects_subject_type ON subjects(subject_type);
-CREATE INDEX idx_resources_resource_type ON resources(resource_type);
-CREATE INDEX idx_policies_enabled ON policies(enabled);
-CREATE INDEX idx_policies_priority ON policies(priority);
-
--- JSONB indexes cho attribute queries
-CREATE INDEX idx_subjects_attributes ON subjects USING GIN(attributes);
-CREATE INDEX idx_resources_attributes ON resources USING GIN(attributes);
+**subjects.json** - User definitions
+```json
+{
+  "subjects": [
+    {
+      "id": "sub-001",
+      "external_id": "john.doe@company.com", 
+      "subject_type": "user",
+      "attributes": {
+        "department": "engineering",
+        "role": ["senior_developer"],
+        "clearance_level": 3
+      }
+    }
+  ]
+}
 ```
 
-#### **5.2 GORM Query Optimization**
-- Use preloading cho related entities
-- Batch queries cho multiple evaluations
-- Connection pooling với proper limits
-- Query result caching với TTL
+**resources.json** - API endpoint definitions
+```json
+{
+  "resources": [
+    {
+      "id": "res-001",
+      "resource_type": "api_endpoint",
+      "resource_id": "/api/v1/users",
+      "attributes": {
+        "data_classification": "internal",
+        "methods": ["GET", "POST"]
+      }
+    }
+  ]
+}
+```
 
-#### **5.3 Memory vs Database Trade-offs**
-- Cache frequently accessed policies in memory
-- Use database cho large datasets và complex queries
-- Fallback to mock data cho development/testing
+**policies.json** - ABAC rules
+```json
+{
+  "policies": [
+    {
+      "id": "pol-001",
+      "policy_name": "Engineering Read Access",
+      "effect": "permit",
+      "priority": 100,
+      "enabled": true,
+      "rules": [
+        {
+          "target_type": "subject",
+          "attribute_path": "attributes.department", 
+          "operator": "eq",
+          "expected_value": "engineering"
+        }
+      ],
+      "actions": ["read"],
+      "resource_patterns": ["/api/v1/*"]
+    }
+  ]
+}
+```
 
-#### **5.4 Rule Evaluation Cache**
-- Cache evaluated rule results trong request lifecycle
-- Avoid re-evaluation của same rules
+## 🚀 Performance & Scalability
 
-#### **5.5 Batch Processing với Database**
-- Group similar requests by entity type
-- Single database query cho multiple evaluations
-- Parallel rule evaluation với goroutines
-- Use database transactions cho consistency
+### Current Performance
+- **In-memory storage** - O(1) lookups cho subjects/resources
+- **Policy evaluation** - O(n) với n = số policies
+- **No caching** - Mỗi request đều evaluate từ đầu
+- **Single-threaded** - Không có concurrent processing
 
-### **6. Audit & Logging**
+### Optimization Opportunities
+1. **Decision Caching** - Cache ABAC decisions với TTL
+2. **Policy Indexing** - Index policies theo resource patterns
+3. **Concurrent Evaluation** - Parallel policy evaluation
+4. **Database Storage** - PostgreSQL thay vì JSON files
+5. **Connection Pooling** - Database connection management
 
-**Every evaluation logs:**
-- Request ID
-- Subject/Resource/Action
-- Decision (Permit/Deny)
-- Policies evaluated
-- Evaluation time (ms)
-- Context details
+### Scalability Considerations
+- **Horizontal Scaling** - Stateless service, có thể scale horizontally
+- **Load Balancing** - Multiple instances behind load balancer
+- **Database Scaling** - Read replicas cho policy data
+- **Caching Layer** - Redis cho decision caching
+- **Monitoring** - Metrics và alerting cho performance
 
-### **7. Testing Strategy**
+## 🔍 Testing Strategy
 
-#### **Unit Tests:**
-- Test each operator individually
-- Test pattern matching logic
-- Test priority ordering
-- Test conflict resolution
+### Unit Tests
+- **Models** - Data structure validation
+- **PDP** - Policy evaluation logic
+- **PIP** - Attribute resolution
+- **PAP** - Storage operations
+- **Operators** - Rule evaluation
 
-#### **Integration Tests:**
-- Full evaluation flow với mock data
-- Test các scenarios từ evaluation_requests.json
-- Verify expected decisions
+### Integration Tests  
+- **HTTP Endpoints** - End-to-end API testing
+- **ABAC Flow** - Complete authorization flow
+- **Error Handling** - Error scenarios và edge cases
 
-#### **Performance Tests:**
-- Measure evaluation latency
-- Test với 1000+ policies
-- Concurrent evaluation tests
+### Performance Tests
+- **Load Testing** - Concurrent request handling
+- **Stress Testing** - High volume scenarios
+- **Latency Testing** - Response time measurement
 
-### **8. Error Handling**
+## 📈 Monitoring & Observability
 
-- Missing attributes → Use defaults or skip rule
-- Invalid data types → Type coercion hoặc fail gracefully
-- Circular dependencies → Detection và prevention
-- Timeout protection → Max evaluation time limit
+### Logging
+```go
+log.Printf("ABAC Decision: %s - Subject: %s, Resource: %s, Action: %s, Reason: %s",
+    decision.Result, subjectID, r.URL.Path, requiredAction, decision.Reason)
+```
 
-**Key Design Principles:**
-1. **Stateless evaluation** - Không lưu state giữa requests
-2. **Fail-safe defaults** - Default DENY cho sensitive resources
-3. **Clear audit trail** - Log mọi decision để debug
-4. **Performance first** - Optimize hot paths với value-based storage
-5. **Memory efficiency** - Use values instead of pointers cho better cache locality
-6. **Extensible operators** - Dễ thêm operators mới
+### Metrics (Future)
+- Request count per endpoint
+- ABAC decision distribution (permit/deny/not_applicable)
+- Evaluation latency
+- Error rates
+- Policy match statistics
 
-Thiết kế này cho phép bạn implement ABAC system hiệu quả với mock data, sau này dễ dàng thay thế bằng real database khi cần.
+### Health Checks
+- `/health` endpoint cho service health
+- Database connectivity checks
+- Policy loading validation

@@ -2,7 +2,13 @@
 
 ## 📋 Tổng Quan Hệ Thống
 
-Hệ thống ABAC này được thiết kế để quản lý quyền truy cập dựa trên thuộc tính (Attribute-Based Access Control) với kiến trúc modular và hiệu suất cao. Hệ thống hỗ trợ cả PostgreSQL database với GORM (production) và mock data từ JSON files (development/testing).
+Hệ thống ABAC này được triển khai dưới dạng **HTTP Service đơn giản** để quản lý quyền truy cập dựa trên thuộc tính (Attribute-Based Access Control). Hệ thống tập trung vào **luồng ABAC cơ bản** với kiến trúc đơn giản, dễ hiểu và dễ tích hợp.
+
+### 🎯 Mục Tiêu Thiết Kế
+- **Đơn giản hóa** - Loại bỏ các tính năng phức tạp không cần thiết
+- **HTTP-first** - RESTful API service thay vì CLI tool
+- **Dễ tích hợp** - Middleware pattern cho existing applications  
+- **Luồng rõ ràng** - User → PEP → PDP → PIP → PAP → Decision → Enforce
 
 ## 🏗️ Kiến Trúc Tổng Thể
 
@@ -80,56 +86,87 @@ abac_go_example/
 
 ## 🔄 Flow Hoạt Động Chi Tiết
 
-### 1. Initialization Flow
+### 1. HTTP Service Initialization Flow
 
 ```mermaid
 graph TD
-    A[main.go] --> B{Storage Type?}
-    B -->|Production| C[Initialize PostgreSQL Storage]
-    B -->|Development| D[Initialize MockStorage]
-    C --> E[Connect to PostgreSQL với GORM]
-    D --> F[Load JSON Data Files]
-    E --> G[Auto-migrate Database Schema]
-    F --> H[Build In-Memory Maps]
-    G --> I[Create PolicyDecisionPoint]
-    H --> I
-    I --> J[Ready for Evaluation]
+    A[main.go] --> B[Initialize MockStorage]
+    B --> C[Load JSON Data Files]
+    C --> D[Build In-Memory Maps]
+    D --> E[Create PolicyDecisionPoint]
+    E --> F[Setup HTTP Server + ABAC Middleware]
+    F --> G[Register Protected Endpoints]
+    G --> H[Start HTTP Server on :8081]
+    H --> I[Ready for HTTP Requests]
 ```
 
 **Chi tiết từng bước:**
 
-1. **PostgreSQL Storage Initialization** (Production):
+1. **MockStorage Initialization**:
    ```go
-   config := storage.DefaultDatabaseConfig()
-   pgStorage, err := storage.NewPostgreSQLStorage(config)
-   ```
-   - Connect to PostgreSQL với connection pooling
-   - Auto-migrate database schema với GORM
-   - Setup indexes cho performance optimization
-   - Handle JSONB data types cho complex attributes
-
-2. **MockStorage Initialization** (Development):
-   ```go
-   mockStorage, err := storage.NewMockStorage(".")
+   storage, err := storage.NewMockStorage(".")
    ```
    - Load `subjects.json`, `resources.json`, `actions.json`, `policies.json`
-   - Build in-memory maps cho fast lookup (using values, not pointers)
-   - Validate data integrity
-   - Optimize memory usage với value-based storage
+   - Build in-memory maps cho fast lookup (O(1) access)
+   - Validate data integrity và relationships
+   - Support resource lookup by both ID và ResourceID
 
-3. **PDP Creation**:
+2. **PDP Creation**:
    ```go
    pdp := evaluator.NewPolicyDecisionPoint(storage)
    ```
    - Initialize AttributeResolver với storage reference
    - Initialize OperatorRegistry với default operators
-   - Setup evaluation engine
+   - Setup evaluation engine cho policy processing
 
-### 2. Evaluation Flow
+3. **HTTP Server Setup**:
+   ```go
+   server := &http.Server{
+       Addr:    ":8081",
+       Handler: corsHandler(mux),
+   }
+   ```
+   - Setup CORS middleware cho cross-origin requests
+   - Register protected endpoints với ABAC middleware
+   - Configure graceful shutdown handling
+
+### 2. HTTP Request Evaluation Flow
 
 ```mermaid
 graph TD
-    A[EvaluationRequest] --> B[EnrichContext]
+    A[HTTP Request + X-Subject-ID] --> B[ABAC Middleware]
+    B --> C[Extract Subject/Resource/Action]
+    C --> D[Create EvaluationRequest]
+    D --> E[PDP.Evaluate]
+    E --> F[PIP.EnrichContext]
+    F --> G[PAP.GetPolicies]
+    G --> H[Policy Evaluation]
+    H --> I{Decision?}
+    I -->|PERMIT| J[Forward to Handler]
+    I -->|DENY| K[Return 403 Forbidden]
+    J --> L[Business Logic Response]
+    K --> M[Error Response với Reason]
+```
+
+**Chi tiết luồng HTTP Request:**
+
+1. **HTTP Request** - Client gửi request với header `X-Subject-ID`
+2. **ABAC Middleware** - Intercept request trước khi đến handler
+3. **Extract Information**:
+   - Subject = `X-Subject-ID` header value
+   - Resource = URL path (e.g., `/api/v1/users`)
+   - Action = required permission (e.g., `read`, `write`, `admin`)
+4. **Create EvaluationRequest** - Package thông tin thành request object
+5. **PDP Evaluation** - Gọi Policy Decision Point
+6. **Decision Enforcement**:
+   - **PERMIT** → Forward request đến business logic handler
+   - **DENY/NOT_APPLICABLE** → Return 403 Forbidden với reason
+
+### 3. Detailed PDP Evaluation Flow
+
+```mermaid
+graph TD
+    A[PDP.Evaluate] --> B[PIP.EnrichContext]
     B --> C[GetApplicablePolicies]
     C --> D[SortByPriority]
     D --> E[EvaluateEachPolicy]
