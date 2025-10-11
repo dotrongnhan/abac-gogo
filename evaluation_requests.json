@@ -1,0 +1,40 @@
+{
+  "evaluation_requests": [
+    {
+      "request_id": "eval-001",
+      "subject_id": "sub-001",
+      "resource_id": "res-001",
+      "action": "read",
+      "context": {
+        "timestamp": "2024-01-15T14:00:00Z",
+        "source_ip": "10.0.1.50"
+      },
+      "expected_decision": "permit",
+      "matched_policies": ["pol-001", "pol-002"]
+    },
+    {
+      "request_id": "eval-002",
+      "subject_id": "sub-004",
+      "resource_id": "res-002",
+      "action": "write",
+      "context": {
+        "timestamp": "2024-01-15T15:00:00Z",
+        "source_ip": "10.0.2.100"
+      },
+      "expected_decision": "deny",
+      "matched_policies": ["pol-004"]
+    },
+    {
+      "request_id": "eval-003",
+      "subject_id": "sub-002",
+      "resource_id": "res-003",
+      "action": "read",
+      "context": {
+        "timestamp": "2024-01-15T09:00:00Z",
+        "source_ip": "192.168.1.100"
+      },
+      "expected_decision": "permit",
+      "matched_policies": ["pol-003"]
+    }
+  ]
+}

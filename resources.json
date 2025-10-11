@@ -1,0 +1,75 @@
+{
+  "resources": [
+    {
+      "id": "res-001",
+      "resource_type": "api_endpoint",
+      "resource_id": "/api/v1/users",
+      "path": "api.v1.users",
+      "metadata": {
+        "description": "User management API",
+        "version": "v1"
+      },
+      "attributes": {
+        "data_classification": "internal",
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "rate_limit": 1000,
+        "requires_auth": true,
+        "pii_data": true
+      }
+    },
+    {
+      "id": "res-002",
+      "resource_type": "database",
+      "resource_id": "prod-db-customers",
+      "path": "database.production.customers",
+      "metadata": {
+        "connection_string": "postgresql://prod-cluster:5432/customers"
+      },
+      "attributes": {
+        "data_classification": "confidential",
+        "environment": "production",
+        "backup_enabled": true,
+        "encryption": "AES-256",
+        "contains_pii": true,
+        "region": "ap-southeast-1"
+      }
+    },
+    {
+      "id": "res-003",
+      "resource_type": "document",
+      "resource_id": "DOC-2024-Q1-FINANCE",
+      "path": "documents.finance.reports.2024.q1",
+      "parent_id": "res-010",
+      "metadata": {
+        "title": "Q1 2024 Financial Report",
+        "created_by": "sub-002"
+      },
+      "attributes": {
+        "data_classification": "highly_confidential",
+        "document_type": "financial_report",
+        "fiscal_year": 2024,
+        "fiscal_quarter": 1,
+        "status": "final",
+        "department": "finance",
+        "requires_nda": true
+      }
+    },
+    {
+      "id": "res-004",
+      "resource_type": "kubernetes_namespace",
+      "resource_id": "production-backend",
+      "path": "k8s.production.backend",
+      "metadata": {
+        "cluster": "eks-prod-cluster",
+        "region": "ap-southeast-1"
+      },
+      "attributes": {
+        "environment": "production",
+        "team_owner": "platform",
+        "criticality": "critical",
+        "auto_scaling": true,
+        "max_replicas": 10
+      }
+    }
+  ]
+}

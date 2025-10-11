@@ -1,0 +1,35 @@
+{
+  "audit_logs": [
+    {
+      "id": 1001,
+      "request_id": "req-abc-111",
+      "subject_id": "sub-001",
+      "resource_id": "res-001",
+      "action_id": "act-001",
+      "decision": "permit",
+      "evaluation_ms": 12,
+      "context": {
+        "policies_evaluated": ["pol-001", "pol-002", "pol-004"],
+        "rules_matched": 5,
+        "source_ip": "10.0.1.50",
+        "user_agent": "curl/7.68.0"
+      },
+      "created_at": "2024-01-15T14:00:00Z"
+    },
+    {
+      "id": 1002,
+      "request_id": "req-abc-112",
+      "subject_id": "sub-004",
+      "resource_id": "res-002",
+      "action_id": "act-002",
+      "decision": "deny",
+      "evaluation_ms": 8,
+      "context": {
+        "policies_evaluated": ["pol-004"],
+        "deny_reason": "user_on_probation",
+        "source_ip": "10.0.2.100"
+      },
+      "created_at": "2024-01-15T14:05:00Z"
+    }
+  ]
+}

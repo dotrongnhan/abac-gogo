@@ -1,0 +1,46 @@
+{
+  "actions": [
+    {
+      "id": "act-001",
+      "action_name": "read",
+      "action_category": "crud",
+      "description": "Read/View resource",
+      "is_system": false
+    },
+    {
+      "id": "act-002",
+      "action_name": "write",
+      "action_category": "crud",
+      "description": "Create/Update resource",
+      "is_system": false
+    },
+    {
+      "id": "act-003",
+      "action_name": "delete",
+      "action_category": "crud",
+      "description": "Delete resource",
+      "is_system": false
+    },
+    {
+      "id": "act-004",
+      "action_name": "execute",
+      "action_category": "system",
+      "description": "Execute queries or commands",
+      "is_system": true
+    },
+    {
+      "id": "act-005",
+      "action_name": "approve",
+      "action_category": "workflow",
+      "description": "Approve requests or changes",
+      "is_system": false
+    },
+    {
+      "id": "act-006",
+      "action_name": "deploy",
+      "action_category": "deployment",
+      "description": "Deploy to environment",
+      "is_system": true
+    }
+  ]
+}
