@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"abac_go_example/evaluator"
 	"abac_go_example/models"
 	"abac_go_example/storage"
+
+	"github.com/gin-gonic/gin"
 )
 
 // ABACService - HTTP service với ABAC authorization
@@ -23,119 +24,127 @@ type ABACService struct {
 }
 
 // ABACMiddleware - Middleware để check ABAC permissions
-func (service *ABACService) ABACMiddleware(requiredAction string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Lấy subject từ header (trong thực tế sẽ từ JWT token)
-			subjectID := r.Header.Get("X-Subject-ID")
-			if subjectID == "" {
-				http.Error(w, "Missing X-Subject-ID header", http.StatusUnauthorized)
-				return
-			}
+func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Lấy subject từ header (trong thực tế sẽ từ JWT token)
+		subjectID := c.GetHeader("X-Subject-ID")
+		if subjectID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing X-Subject-ID header"})
+			c.Abort()
+			return
+		}
 
-			// Tạo evaluation request
-			request := &models.EvaluationRequest{
-				RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
-				SubjectID:  subjectID,
-				ResourceID: r.URL.Path,
-				Action:     requiredAction,
-				Context: map[string]interface{}{
-					"method":    r.Method,
-					"timestamp": time.Now().UTC().Format(time.RFC3339),
-					"user_ip":   r.RemoteAddr,
-				},
-			}
+		// Tạo evaluation request
+		request := &models.EvaluationRequest{
+			RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
+			SubjectID:  subjectID,
+			ResourceID: c.Request.URL.Path,
+			Action:     requiredAction,
+			Context: map[string]interface{}{
+				"method":    c.Request.Method,
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"user_ip":   c.ClientIP(),
+			},
+		}
 
-			// Kiểm tra quyền với PDP
-			decision, err := service.pdp.Evaluate(request)
-			if err != nil {
-				log.Printf("ABAC evaluation error: %v", err)
-				http.Error(w, "Authorization error", http.StatusInternalServerError)
-				return
-			}
+		// Kiểm tra quyền với PDP
+		decision, err := service.pdp.Evaluate(request)
+		if err != nil {
+			log.Printf("ABAC evaluation error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization error"})
+			c.Abort()
+			return
+		}
 
-			// Log decision
-			log.Printf("ABAC Decision: %s - Subject: %s, Resource: %s, Action: %s, Reason: %s",
-				decision.Result, subjectID, r.URL.Path, requiredAction, decision.Reason)
+		// Log decision
+		log.Printf("ABAC Decision: %s - Subject: %s, Resource: %s, Action: %s, Reason: %s",
+			decision.Result, subjectID, c.Request.URL.Path, requiredAction, decision.Reason)
 
-			// Kiểm tra kết quả
-			if decision.Result != "permit" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"error":    "Access denied",
-					"reason":   decision.Reason,
-					"subject":  subjectID,
-					"resource": r.URL.Path,
-					"action":   requiredAction,
-				})
-				return
-			}
+		// Kiểm tra kết quả
+		if decision.Result != "permit" {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":    "Access denied",
+				"reason":   decision.Reason,
+				"subject":  subjectID,
+				"resource": c.Request.URL.Path,
+				"action":   requiredAction,
+			})
+			c.Abort()
+			return
+		}
 
-			// Cho phép request tiếp tục
-			next.ServeHTTP(w, r)
-		})
+		// Cho phép request tiếp tục
+		c.Next()
 	}
 }
 
 // API Handlers
-func (service *ABACService) handleUsers(w http.ResponseWriter, r *http.Request) {
+func (service *ABACService) handleUsers(c *gin.Context) {
 	users := []map[string]interface{}{
 		{"id": "1", "name": "John Doe", "department": "Engineering"},
 		{"id": "2", "name": "Alice Smith", "department": "Finance"},
 		{"id": "3", "name": "Bob Wilson", "department": "Engineering"},
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(http.StatusOK, gin.H{
 		"users":   users,
 		"message": "Users retrieved successfully",
 	})
 }
 
-func (service *ABACService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+func (service *ABACService) handleCreateUser(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
 		"message": "User created successfully",
 		"user_id": "new_user_123",
 	})
 }
 
-func (service *ABACService) handleFinancialData(w http.ResponseWriter, r *http.Request) {
+func (service *ABACService) handleFinancialData(c *gin.Context) {
 	data := map[string]interface{}{
 		"revenue":  "$1,000,000",
 		"expenses": "$800,000",
 		"profit":   "$200,000",
 		"quarter":  "Q1 2024",
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(http.StatusOK, gin.H{
 		"financial_data": data,
 		"message":        "Financial data retrieved successfully",
 	})
 }
 
-func (service *ABACService) handleAdminPanel(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+func (service *ABACService) handleAdminPanel(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
 		"message":         "Admin panel accessed",
 		"admin_functions": []string{"user_management", "system_config", "audit_logs"},
 	})
 }
 
 // Health check endpoint (không cần ABAC)
-func handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+func handleHealth(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
 		"service":   "ABAC Authorization Service",
 	})
 }
 
+// CORS middleware (đơn giản)
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Subject-ID")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusOK)
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func main() {
-	fmt.Println("🚀 Starting ABAC HTTP Service...")
+	fmt.Println("🚀 Starting ABAC HTTP Service with Gin...")
 
 	// Khởi tạo storage
 	storage, err := storage.NewMockStorage(".")
@@ -152,45 +161,38 @@ func main() {
 		storage: storage,
 	}
 
-	// Setup routes
-	mux := http.NewServeMux()
+	// Setup Gin router
+	router := gin.Default()
+
+	// CORS middleware
+	router.Use(corsMiddleware())
 
 	// Health check (không cần authorization)
-	mux.HandleFunc("/health", handleHealth)
+	router.GET("/health", handleHealth)
 
 	// Protected endpoints với ABAC middleware
-	mux.Handle("/api/v1/users", service.ABACMiddleware("read")(http.HandlerFunc(service.handleUsers)))
-	mux.Handle("/api/v1/users/create", service.ABACMiddleware("write")(http.HandlerFunc(service.handleCreateUser)))
-	mux.Handle("/api/v1/financial", service.ABACMiddleware("read")(http.HandlerFunc(service.handleFinancialData)))
-	mux.Handle("/api/v1/admin", service.ABACMiddleware("admin")(http.HandlerFunc(service.handleAdminPanel)))
-
-	// Debug: List all routes
-	mux.HandleFunc("/debug/routes", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		routes := []string{"/health", "/api/v1/users", "/api/v1/users/create", "/api/v1/financial", "/api/v1/admin"}
-		json.NewEncoder(w).Encode(map[string]interface{}{"routes": routes})
-	})
-
-	// CORS middleware (đơn giản)
-	corsHandler := func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Subject-ID")
-
-			if r.Method == "OPTIONS" {
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-
-			h.ServeHTTP(w, r)
-		})
+	apiV1 := router.Group("/api/v1")
+	{
+		apiV1.GET("/users", service.ABACMiddleware("read"), service.handleUsers)
+		apiV1.POST("/users/create", service.ABACMiddleware("write"), service.handleCreateUser)
+		apiV1.GET("/financial", service.ABACMiddleware("read"), service.handleFinancialData)
+		apiV1.GET("/admin", service.ABACMiddleware("admin"), service.handleAdminPanel)
 	}
+
+	// Debug: List all routes (Gin does this automatically in debug mode)
+	// You can add a custom one if needed
+	router.GET("/debug/routes", func(c *gin.Context) {
+		routes := []gin.H{}
+		for _, r := range router.Routes() {
+			routes = append(routes, gin.H{"method": r.Method, "path": r.Path})
+		}
+		c.JSON(http.StatusOK, gin.H{"routes": routes})
+	})
 
 	// HTTP server
 	server := &http.Server{
 		Addr:    ":8081",
-		Handler: corsHandler(mux),
+		Handler: router,
 	}
 
 	// Graceful shutdown
