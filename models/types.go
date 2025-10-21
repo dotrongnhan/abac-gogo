@@ -100,6 +100,124 @@ func (j *JSONPolicyRules) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, j)
 }
 
+// JSONStatements is a custom type for handling []PolicyStatement in GORM
+type JSONStatements []PolicyStatement
+
+// Value implements the driver.Valuer interface for GORM
+func (j JSONStatements) Value() (driver.Value, error) {
+	if j == nil {
+		return nil, nil
+	}
+	return json.Marshal(j)
+}
+
+// Scan implements the sql.Scanner interface for GORM
+func (j *JSONStatements) Scan(value interface{}) error {
+	if value == nil {
+		*j = nil
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan %T into JSONStatements", value)
+	}
+
+	return json.Unmarshal(bytes, j)
+}
+
+// JSONActionResource is a custom type for handling string or []string
+type JSONActionResource struct {
+	Single   string
+	Multiple []string
+	IsArray  bool
+}
+
+// Value implements the driver.Valuer interface for GORM
+func (j JSONActionResource) Value() (driver.Value, error) {
+	if j.IsArray {
+		return json.Marshal(j.Multiple)
+	}
+	return json.Marshal(j.Single)
+}
+
+// Scan implements the sql.Scanner interface for GORM
+func (j *JSONActionResource) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan %T into JSONActionResource", value)
+	}
+
+	// Try to unmarshal as array first
+	var arr []string
+	if err := json.Unmarshal(bytes, &arr); err == nil {
+		j.Multiple = arr
+		j.IsArray = true
+		return nil
+	}
+
+	// If that fails, try as single string
+	var str string
+	if err := json.Unmarshal(bytes, &str); err == nil {
+		j.Single = str
+		j.IsArray = false
+		return nil
+	}
+
+	return fmt.Errorf("cannot unmarshal %s into JSONActionResource", string(bytes))
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling
+func (j *JSONActionResource) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as array first
+	var arr []string
+	if err := json.Unmarshal(data, &arr); err == nil {
+		j.Multiple = arr
+		j.IsArray = true
+		return nil
+	}
+
+	// If that fails, try as single string
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		j.Single = str
+		j.IsArray = false
+		return nil
+	}
+
+	return fmt.Errorf("cannot unmarshal %s into JSONActionResource", string(data))
+}
+
+// MarshalJSON implements custom JSON marshaling
+func (j JSONActionResource) MarshalJSON() ([]byte, error) {
+	if j.IsArray {
+		return json.Marshal(j.Multiple)
+	}
+	return json.Marshal(j.Single)
+}
+
+// GetValues returns all values as a slice
+func (j JSONActionResource) GetValues() []string {
+	if j.IsArray {
+		return j.Multiple
+	}
+	return []string{j.Single}
+}
+
 // Subject represents a user, service, or application
 type Subject struct {
 	ID          string    `json:"id" gorm:"primaryKey;size:255"`
@@ -147,21 +265,16 @@ func (Action) TableName() string {
 	return "actions"
 }
 
-// Policy represents an access control policy
+// Policy represents an access control policy following the new JSON schema
 type Policy struct {
-	ID               string          `json:"id" gorm:"primaryKey;size:255"`
-	PolicyName       string          `json:"policy_name" gorm:"size:255;not null;uniqueIndex"`
-	Description      string          `json:"description" gorm:"type:text"`
-	Effect           string          `json:"effect" gorm:"size:10;not null;index"` // "permit" or "deny"
-	Priority         int             `json:"priority" gorm:"not null;index"`
-	Enabled          bool            `json:"enabled" gorm:"default:true;index"`
-	Version          int             `json:"version" gorm:"default:1"`
-	Conditions       JSONMap         `json:"conditions" gorm:"type:jsonb"`
-	Rules            JSONPolicyRules `json:"rules" gorm:"type:jsonb"`
-	Actions          JSONStringSlice `json:"actions" gorm:"type:jsonb"`
-	ResourcePatterns JSONStringSlice `json:"resource_patterns" gorm:"type:jsonb"`
-	CreatedAt        time.Time       `json:"created_at,omitempty" gorm:"autoCreateTime"`
-	UpdatedAt        time.Time       `json:"updated_at,omitempty" gorm:"autoUpdateTime"`
+	ID          string         `json:"id" gorm:"primaryKey;size:255"`
+	PolicyName  string         `json:"policy_name" gorm:"size:255;not null;uniqueIndex"`
+	Description string         `json:"description" gorm:"type:text"`
+	Version     string         `json:"version" gorm:"size:50;not null"`
+	Statement   JSONStatements `json:"statement" gorm:"type:jsonb"`
+	Enabled     bool           `json:"enabled" gorm:"default:true;index"`
+	CreatedAt   time.Time      `json:"created_at,omitempty" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time      `json:"updated_at,omitempty" gorm:"autoUpdateTime"`
 }
 
 // TableName specifies the table name for Policy
@@ -169,7 +282,7 @@ func (Policy) TableName() string {
 	return "policies"
 }
 
-// PolicyRule represents a single rule within a policy
+// PolicyRule represents a single rule within a policy (legacy format)
 type PolicyRule struct {
 	ID            string      `json:"id,omitempty"`
 	TargetType    string      `json:"target_type"`    // "subject", "resource", "action", "environment"
@@ -178,6 +291,21 @@ type PolicyRule struct {
 	ExpectedValue interface{} `json:"expected_value"`
 	IsNegative    bool        `json:"is_negative,omitempty"`
 	RuleOrder     int         `json:"rule_order,omitempty"`
+}
+
+// PolicyStatement represents a statement in the new policy format
+type PolicyStatement struct {
+	Sid       string             `json:"Sid,omitempty"`       // Statement ID for debugging
+	Effect    string             `json:"Effect"`              // "Allow" or "Deny"
+	Action    JSONActionResource `json:"Action"`              // string or []string
+	Resource  JSONActionResource `json:"Resource"`            // string or []string
+	Condition JSONMap            `json:"Condition,omitempty"` // Runtime conditions
+}
+
+// PolicyDocument represents the complete policy document
+type PolicyDocument struct {
+	Version   string            `json:"Version"`
+	Statement []PolicyStatement `json:"Statement"`
 }
 
 // EvaluationRequest represents a request for policy evaluation

@@ -191,51 +191,59 @@ func SeedTestData(t *testing.T, storage *PostgreSQLStorage) {
 		}
 	}
 
-	// Create test policies
+	// Create test policies using new format
 	policies := []*models.Policy{
 		{
 			ID:          "pol-001",
 			PolicyName:  "Engineering Read Access",
 			Description: "Allow engineering team to read technical resources",
-			Effect:      "permit",
-			Priority:    100,
+			Version:     "2024-10-21",
 			Enabled:     true,
-			Version:     1,
-			Rules: models.JSONPolicyRules{
+			Statement: models.JSONStatements{
 				{
-					TargetType:    "subject",
-					AttributePath: "attributes.department",
-					Operator:      "eq",
-					ExpectedValue: "engineering",
-				},
-				{
-					TargetType:    "resource",
-					AttributePath: "attributes.data_classification",
-					Operator:      "in",
-					ExpectedValue: []interface{}{"public", "internal"},
+					Sid:    "EngineeringReadAccess",
+					Effect: "Allow",
+					Action: models.JSONActionResource{
+						Single:  "document-service:file:read",
+						IsArray: false,
+					},
+					Resource: models.JSONActionResource{
+						Single:  "api:documents:dept:engineering/*",
+						IsArray: false,
+					},
+					Condition: models.JSONMap{
+						"StringEquals": map[string]interface{}{
+							"user.department": "engineering",
+						},
+					},
 				},
 			},
-			Actions:          models.JSONStringSlice{"read"},
-			ResourcePatterns: models.JSONStringSlice{"/api/v1/*", "/docs/technical/*"},
 		},
 		{
 			ID:          "pol-004",
 			PolicyName:  "Deny Probation Write",
 			Description: "Deny write access for employees on probation",
-			Effect:      "deny",
-			Priority:    10,
+			Version:     "2024-10-21",
 			Enabled:     true,
-			Version:     1,
-			Rules: models.JSONPolicyRules{
+			Statement: models.JSONStatements{
 				{
-					TargetType:    "subject",
-					AttributePath: "attributes.on_probation",
-					Operator:      "eq",
-					ExpectedValue: true,
+					Sid:    "DenyProbationWrite",
+					Effect: "Deny",
+					Action: models.JSONActionResource{
+						Multiple: []string{"document-service:file:write", "document-service:file:delete"},
+						IsArray:  true,
+					},
+					Resource: models.JSONActionResource{
+						Single:  "*",
+						IsArray: false,
+					},
+					Condition: models.JSONMap{
+						"Bool": map[string]interface{}{
+							"user.on_probation": true,
+						},
+					},
 				},
 			},
-			Actions:          models.JSONStringSlice{"write", "delete", "deploy"},
-			ResourcePatterns: models.JSONStringSlice{"*"},
 		},
 	}
 

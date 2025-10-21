@@ -50,47 +50,54 @@ func TestPolicyValidation(t *testing.T) {
 		ID:          "pol-001",
 		PolicyName:  "Test Policy",
 		Description: "Test policy description",
-		Effect:      "permit",
-		Priority:    100,
+		Version:     "2024-10-21",
 		Enabled:     true,
-		Version:     1,
-		Rules: []PolicyRule{
+		Statement: []PolicyStatement{
 			{
-				TargetType:    "subject",
-				AttributePath: "attributes.department",
-				Operator:      "eq",
-				ExpectedValue: "engineering",
+				Sid:    "TestStatement",
+				Effect: "Allow",
+				Action: JSONActionResource{
+					Single:  "document-service:file:read",
+					IsArray: false,
+				},
+				Resource: JSONActionResource{
+					Single:  "api:documents:*",
+					IsArray: false,
+				},
+				Condition: JSONMap{
+					"StringEquals": map[string]interface{}{
+						"user.department": "engineering",
+					},
+				},
 			},
 		},
-		Actions:          []string{"read"},
-		ResourcePatterns: []string{"/api/v1/*"},
 	}
 
 	// Test valid effects
-	validEffects := []string{"permit", "deny"}
+	validEffects := []string{"Allow", "Deny"}
 	for _, effect := range validEffects {
-		policy.Effect = effect
-		if policy.Effect != effect {
-			t.Errorf("Expected effect %s, got %s", effect, policy.Effect)
+		policy.Statement[0].Effect = effect
+		if policy.Statement[0].Effect != effect {
+			t.Errorf("Expected effect %s, got %s", effect, policy.Statement[0].Effect)
 		}
 	}
 
-	// Test rule validation
-	if len(policy.Rules) == 0 {
-		t.Error("Policy should have at least one rule")
+	// Test statement validation
+	if len(policy.Statement) == 0 {
+		t.Error("Policy should have at least one statement")
 	}
 
-	rule := policy.Rules[0]
-	if rule.TargetType == "" {
-		t.Error("Rule target type should not be empty")
+	stmt := policy.Statement[0]
+	if stmt.Effect == "" {
+		t.Error("Statement effect should not be empty")
 	}
 
-	if rule.AttributePath == "" {
-		t.Error("Rule attribute path should not be empty")
+	if stmt.Action.Single == "" && len(stmt.Action.Multiple) == 0 {
+		t.Error("Statement should have an action")
 	}
 
-	if rule.Operator == "" {
-		t.Error("Rule operator should not be empty")
+	if stmt.Resource.Single == "" && len(stmt.Resource.Multiple) == 0 {
+		t.Error("Statement should have a resource")
 	}
 }
 

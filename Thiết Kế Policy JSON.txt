@@ -1,0 +1,806 @@
+# Thiết Kế Policy JSON - ABAC System (Implementation-First)
+
+## 1. Problem & Solution
+
+### Vấn Đề
+- Hardcode permission logic trong code → khó maintain
+- RBAC không đủ flexible cho dynamic rules
+- Khó audit và debug quyền hạn
+
+### Giải Pháp
+Policy-as-Data: Tách logic authorization thành JSON declarative format
+
+---
+
+## 2. Core Architecture
+
+```
+Request {subject, action, resource, context}
+         │
+         ▼
+┌─────────────────────┐
+│  1. Match Action    │ ← Filter policies by action pattern
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  2. Match Resource  │ ← Filter policies by resource pattern
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  3. Eval Condition  │ ← Check runtime context
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  4. Combine Effects │ ← Deny-Override algorithm
+└─────────┬───────────┘
+          │
+          ▼
+    Allow / Deny
+```
+
+---
+
+## 3. Policy JSON Schema
+
+```json
+{
+  "Version": "2024-10-21",
+  "Statement": [
+    {
+      "Sid": "StatementId",
+      "Effect": "Allow" | "Deny",
+      "Action": <string | array>,
+      "Resource": <string | array>,
+      "Condition": <object>
+    }
+  ]
+}
+```
+
+### Field Specs
+
+| Field | Required | Type | Purpose |
+|-------|----------|------|---------|
+| `Version` | ✓ | string | Schema version cho migration |
+| `Statement` | ✓ | array | Mảng các rules (min: 1) |
+| `Sid` | ✗ | string | Statement ID cho debug |
+| `Effect` | ✓ | enum | "Allow" hoặc "Deny" |
+| `Action` | ✓ | string\|array | Operations được phép/cấm |
+| `Resource` | ✓ | string\|array | Scope tài nguyên |
+| `Condition` | ✗ | object | Runtime validation |
+
+---
+
+## 4. Action Field
+
+### 4.1 Format
+
+```
+<service>:<resource-type>:<operation>
+
+Examples:
+payment-service:transaction:create
+document-service:file:read
+user-service:profile:update
+```
+
+**Components:**
+- **service**: `payment-service`, `user-service` (lowercase-hyphen)
+- **resource-type**: `transaction`, `file`, `profile` (singular noun)
+- **operation**: `create`, `read`, `update`, `delete`, `list`
+
+### 4.2 CRUD Operations
+
+```
+create  - Tạo mới
+read    - Đọc single resource
+list    - Đọc multiple resources
+update  - Cập nhật
+delete  - Xóa
+
+Extended:
+search, describe, approve, reject, export, import, share
+```
+
+### 4.3 Wildcards
+
+```json
+// Single action
+"Action": "document-service:file:read"
+
+// Multiple actions (OR logic)
+"Action": [
+  "document-service:file:read",
+  "document-service:file:list"
+]
+
+// Wildcards
+"Action": "document-service:file:*"      // All ops on file
+"Action": "document-service:*:read"      // Read all types
+"Action": "*:*:read"                     // Read across services
+"Action": "*"                            // All actions (⚠️ dangerous)
+```
+
+### 4.4 Matching Logic
+
+```
+Request: "document-service:file:read"
+Pattern: "document-service:*:read"
+
+Step 1: Split by ':'
+  Pattern:  ["document-service", "*", "read"]
+  Request:  ["document-service", "file", "read"]
+
+Step 2: Match segment-by-segment
+  "document-service" == "document-service" ✓
+  "*" matches "file" ✓
+  "read" == "read" ✓
+
+Result: ✓ Match
+```
+
+---
+
+## 5. Resource Field
+
+### 5.1 Format
+
+```
+<service>:<resource-type>:<resource-id>
+
+Examples:
+api:users:123
+api:departments:dept-456
+storage:files:doc.pdf
+```
+
+### 5.2 Hierarchical Format
+
+```
+<service>:<parent-type>:<parent-id>/<child-type>:<child-id>
+
+Examples:
+api:departments:123/users:456
+api:projects:proj-1/tasks:task-99
+storage:buckets:my-bucket/objects:file.txt
+```
+
+### 5.3 Wildcards
+
+```json
+// Patterns
+"Resource": "api:users:123"              // Exact
+"Resource": "api:users:*"                // All users
+"Resource": "api:users:admin-*"          // Prefix match
+"Resource": "api:departments:*/users:*"  // Hierarchical wildcard
+
+// Multiple resources (OR logic)
+"Resource": [
+  "api:users:*",
+  "api:groups:*"
+]
+
+// Exclusion
+"Resource": "api:*:*",
+"NotResource": [
+  "api:admin:*",
+  "api:system:*"
+]
+```
+
+### 5.4 Matching Logic
+
+```
+Pattern: api:users:admin-*
+Resource: api:users:admin-123
+
+Step 1: Split by ':' and '/'
+  Pattern:  ["api", "users", "admin-*"]
+  Resource: ["api", "users", "admin-123"]
+
+Step 2: Match each segment
+  "api" == "api" ✓
+  "users" == "users" ✓
+  "admin-*" matches "admin-123" ✓ (prefix wildcard)
+
+Result: ✓ Match
+```
+
+**Wildcard Matching:**
+- `*` = match anything
+- `prefix-*` = starts with "prefix-"
+- `*-suffix` = ends with "-suffix"
+- `*-middle-*` = contains "-middle-"
+
+---
+
+## 6. Condition Field
+
+### 6.1 Purpose
+
+Runtime validation cho dynamic attributes mà Action/Resource không thể biểu diễn:
+- Time-based access
+- IP restrictions
+- Attribute-based rules (owner, department, file size...)
+
+### 6.2 Structure
+
+```json
+{
+  "Condition": {
+    "<Operator>": {
+      "<ContextKey>": <value | array>
+    }
+  }
+}
+```
+
+### 6.3 Operators
+
+#### String
+```json
+{
+  "StringEquals": {"user.department": "engineering"},
+  "StringNotEquals": {"resource.status": "deleted"},
+  "StringLike": {"user.email": "*@company.com"}
+}
+```
+
+#### Numeric
+```json
+{
+  "NumericLessThan": {"payment.amount": 10000000},
+  "NumericGreaterThanEquals": {"user.level": 5}
+}
+```
+
+#### Boolean
+```json
+{
+  "Bool": {
+    "user.mfa": true,
+    "resource.public": false
+  }
+}
+```
+
+#### IP Address
+```json
+{
+  "IpAddress": {
+    "request.sourceIp": ["10.0.0.0/8", "192.168.1.0/24"]
+  }
+}
+```
+
+#### Date/Time
+```json
+{
+  "DateGreaterThan": {"request.time": "2024-01-01T00:00:00Z"},
+  "DateLessThan": {"request.time": "2024-12-31T23:59:59Z"}
+}
+```
+
+### 6.4 Context Variables
+
+```json
+// Request context
+"request:UserId": "user-123"
+"request:SourceIp": "10.0.0.5"
+"request:Time": "2024-10-21T10:00:00Z"
+
+// Resource attributes (lookup from DB/service)
+"resource:OwnerId": "user-456"
+"resource:Department": "engineering"
+"resource:Status": "active"
+"resource:Sensitivity": "confidential"
+
+// User attributes
+"user:Department": "engineering"
+"user:Level": 5
+"user:MfaEnabled": true
+```
+
+### 6.5 Variable Substitution
+
+```json
+{
+  "Condition": {
+    "StringEquals": {
+      "resource.ownerId": "${request:UserId}"
+    }
+  }
+}
+
+Runtime expansion:
+${request:UserId} → "user-123"
+→ Check: resource.ownerId == "user-123"
+```
+
+### 6.6 Multiple Conditions (AND)
+
+```json
+{
+  "Condition": {
+    "StringEquals": {"user.department": "finance"},
+    "Bool": {"user.mfa": true},
+    "IpAddress": {"request.sourceIp": ["10.0.0.0/8"]}
+  }
+}
+
+Semantic: ALL conditions must pass (AND logic)
+```
+
+---
+
+## 7. Evaluation Engine
+
+### 7.1 Combining Algorithm: Deny-Override
+
+```
+Algorithm:
+1. Collect matching policies (Action + Resource + Condition pass)
+2. If ANY policy has Effect: "Deny" → DENY
+3. Else if ANY policy has Effect: "Allow" → ALLOW
+4. Else → Implicit DENY (default)
+
+Rationale:
+- Security-first: Deny always wins
+- Explicit is better than implicit
+- Easy to reason about
+```
+
+**Flowchart:**
+```
+Find Matching Policies
+         │
+         ▼
+   ┌──────────┐
+   │Any Deny? │─YES→ DENY ✗
+   └────┬─────┘
+        │NO
+        ▼
+   ┌──────────┐
+   │Any Allow?│─YES→ ALLOW ✓
+   └────┬─────┘
+        │NO
+        ▼
+   Implicit DENY ✗
+```
+
+### 7.2 Evaluation Steps
+
+```go
+func Evaluate(request Request, policies []Policy) Decision {
+    matchedPolicies := []Policy{}
+    
+    // Step 1: Filter matching policies
+    for _, policy := range policies {
+        for _, stmt := range policy.Statements {
+            if !matchAction(stmt.Action, request.Action) {
+                continue
+            }
+            if !matchResource(stmt.Resource, request.Resource) {
+                continue
+            }
+            if !evalCondition(stmt.Condition, request.Context) {
+                continue
+            }
+            matchedPolicies = append(matchedPolicies, stmt)
+        }
+    }
+    
+    // Step 2: Apply Deny-Override
+    for _, stmt := range matchedPolicies {
+        if stmt.Effect == "Deny" {
+            return Decision{Result: Deny, Reason: stmt.Sid}
+        }
+    }
+    
+    // Step 3: Check for Allow
+    for _, stmt := range matchedPolicies {
+        if stmt.Effect == "Allow" {
+            return Decision{Result: Allow, Reason: stmt.Sid}
+        }
+    }
+    
+    // Step 4: Default Deny
+    return Decision{Result: Deny, Reason: "ImplicitDeny"}
+}
+```
+
+### 7.3 Matching Functions (Pseudo-code)
+
+```go
+func matchAction(pattern string, action string) bool {
+    patternParts := strings.Split(pattern, ":")
+    actionParts := strings.Split(action, ":")
+    
+    if len(patternParts) != len(actionParts) {
+        return false
+    }
+    
+    for i := 0; i < len(patternParts); i++ {
+        if !matchSegment(patternParts[i], actionParts[i]) {
+            return false
+        }
+    }
+    return true
+}
+
+func matchSegment(pattern string, value string) bool {
+    if pattern == "*" {
+        return true
+    }
+    if strings.Contains(pattern, "*") {
+        return matchWildcard(pattern, value)
+    }
+    return pattern == value
+}
+
+func matchWildcard(pattern string, value string) bool {
+    // Convert wildcard to regex
+    // "admin-*" → "^admin-.*$"
+    // "*-temp" → "^.*-temp$"
+    regex := wildcardToRegex(pattern)
+    return regex.MatchString(value)
+}
+```
+
+---
+
+## 8. Complete Examples
+
+### 8.1 Department-Scoped Access
+
+```json
+{
+  "Version": "2024-10-21",
+  "Statement": [
+    {
+      "Sid": "OwnDocumentsFullAccess",
+      "Effect": "Allow",
+      "Action": "document-service:file:*",
+      "Resource": "api:documents:owner:${request:UserId}/*"
+    },
+    {
+      "Sid": "DepartmentDocumentsRead",
+      "Effect": "Allow",
+      "Action": [
+        "document-service:file:read",
+        "document-service:file:list"
+      ],
+      "Resource": "api:documents:dept:${user:Department}/*",
+      "Condition": {
+        "StringNotEquals": {
+          "resource:Sensitivity": "confidential"
+        }
+      }
+    },
+    {
+      "Sid": "DenyConfidentialDelete",
+      "Effect": "Deny",
+      "Action": "document-service:file:delete",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "resource:Sensitivity": "confidential"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Evaluation Example:**
+
+```
+Request:
+  User: user-123 (Department: Engineering)
+  Action: document-service:file:delete
+  Resource: api:documents:doc-456
+
+Context:
+  request:UserId = "user-123"
+  user:Department = "engineering"
+  resource:Sensitivity = "confidential" (lookup từ DB)
+
+Step 1: Match Statement 1
+  Action: "document-service:file:*" matches "document-service:file:delete" ✓
+  Resource: Check if doc-456 owner == user-123
+    → Giả sử NO → Skip
+
+Step 2: Match Statement 2
+  Action: Only read/list, not delete → Skip
+
+Step 3: Match Statement 3
+  Action: "document-service:file:delete" matches exactly ✓
+  Resource: "*" matches anything ✓
+  Condition: resource.Sensitivity == "confidential" ✓
+  Effect: Deny → DENY
+
+Result: DENY (Statement 3)
+```
+
+### 8.2 Amount-Based Approval
+
+```json
+{
+  "Statement": [
+    {
+      "Sid": "SmallTransactions",
+      "Effect": "Allow",
+      "Action": "payment-service:transaction:approve",
+      "Resource": "api:transactions:*",
+      "Condition": {
+        "NumericLessThan": {
+          "transaction:Amount": 1000000
+        }
+      }
+    },
+    {
+      "Sid": "LargeTransactionsNeedManager",
+      "Effect": "Allow",
+      "Action": "payment-service:transaction:approve",
+      "Resource": "api:transactions:*",
+      "Condition": {
+        "NumericGreaterThanEquals": {
+          "transaction:Amount": 1000000
+        },
+        "StringEquals": {
+          "user:Role": "manager"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 8.3 Time-Based Access
+
+```json
+{
+  "Sid": "BusinessHoursOnly",
+  "Effect": "Allow",
+  "Action": "payment-service:transaction:create",
+  "Resource": "api:transactions:*",
+  "Condition": {
+    "DateGreaterThan": {
+      "request:TimeOfDay": "09:00:00"
+    },
+    "DateLessThan": {
+      "request:TimeOfDay": "18:00:00"
+    }
+  }
+}
+```
+
+---
+
+## 9. Implementation Checklist
+
+### Phase 1: Core Engine
+- [ ] Parse JSON policy format
+- [ ] Implement Action matching (exact + wildcard)
+- [ ] Implement Resource matching (exact + wildcard + hierarchical)
+- [ ] Implement Condition evaluators (String, Numeric, Bool, IP, Date)
+- [ ] Implement variable substitution (`${...}`)
+- [ ] Implement Deny-Override combining algorithm
+
+### Phase 2: Context Management
+- [ ] Define Context interface cho request attributes
+- [ ] Implement resource attribute lookup (call to DB/service)
+- [ ] Implement user attribute lookup
+
+### Phase 3: Integration
+- [ ] Policy storage (file/DB)
+- [ ] Policy loader (parse và validate)
+- [ ] Evaluation API: `Evaluate(subject, action, resource, context) → Allow/Deny`
+- [ ] Error handling (invalid policy, missing context, timeout)
+
+### Phase 4: Observability
+- [ ] Audit log: ghi lại decisions (allow/deny + reason)
+- [ ] Metrics: count allow/deny, evaluation time
+- [ ] Debug mode: show which statements matched
+
+---
+
+## 10. Design Principles
+
+### 10.1 Separation of Concerns
+
+```
+Action     → WHAT operations (static definition)
+Resource   → WHERE/ON WHICH (pattern matching)
+Condition  → WHEN/UNDER WHAT (dynamic runtime)
+
+Rule:
+- Static attributes → Encode trong Resource pattern
+- Dynamic attributes → Check trong Condition
+```
+
+### 10.2 Security-First
+
+```
+❌ BAD: Default Allow
+{
+  "Effect": "Allow",
+  "Action": "*",
+  "Resource": "*"
+}
+
+✓ GOOD: Specific + Deny-Override
+{
+  "Effect": "Allow",
+  "Action": "document-service:file:read",
+  "Resource": "api:documents:dept:${user:Department}/*"
+}
+```
+
+### 10.3 Explicit Over Implicit
+
+```
+// Prefer this (clear intent)
+{
+  "Effect": "Deny",
+  "Action": "payment-service:transaction:delete",
+  "Resource": "*"
+}
+
+// Over relying on implicit deny
+// (không có policy → implicit deny, khó debug)
+```
+
+---
+
+## 11. Testing Strategy
+
+### 11.1 Unit Tests
+
+```go
+func TestActionMatching(t *testing.T) {
+    tests := []struct{
+        pattern string
+        action string
+        expected bool
+    }{
+        {"doc:file:read", "doc:file:read", true},
+        {"doc:file:*", "doc:file:read", true},
+        {"doc:*:read", "doc:file:read", true},
+        {"doc:file:read", "doc:file:write", false},
+    }
+    
+    for _, tt := range tests {
+        result := matchAction(tt.pattern, tt.action)
+        assert.Equal(t, tt.expected, result)
+    }
+}
+```
+
+### 11.2 Integration Tests
+
+```go
+func TestEvaluation(t *testing.T) {
+    policy := loadPolicy("testdata/policy.json")
+    
+    // Test case 1: Allow own documents
+    decision := Evaluate(Request{
+        Subject: "user-123",
+        Action: "doc:file:read",
+        Resource: "api:documents:owner:user-123/file-1",
+    }, policy)
+    assert.Equal(t, Allow, decision.Result)
+    
+    // Test case 2: Deny confidential
+    decision = Evaluate(Request{
+        Subject: "user-123",
+        Action: "doc:file:read",
+        Resource: "api:documents:doc-2",
+        Context: map[string]string{
+            "resource:Sensitivity": "confidential",
+        },
+    }, policy)
+    assert.Equal(t, Deny, decision.Result)
+}
+```
+
+---
+
+## 12. Common Pitfalls
+
+### ❌ Case Sensitivity
+```
+Problem: "Document-Service:File:Read" vs "document-service:file:read"
+Solution: Normalize to lowercase khi parse policy
+```
+
+### ❌ Missing Context
+```
+Problem: Condition check "resource:OwnerId" but không có trong context
+Solution: Return error hoặc treat as condition fail
+```
+
+### ❌ Circular Logic
+```
+Problem: Resource pattern "api:documents:owner:${resource:OwnerId}/*"
+  → Cần query resource để match, nhưng chưa có permission query
+Solution: Tách resource lookup ra khỏi policy matching
+```
+
+### ❌ Wildcard Overlaps
+```
+Problem:
+  Policy A: "doc:*:read" (Allow)
+  Policy B: "doc:file:*" (Deny)
+  Request: "doc:file:read"
+  
+Solution: Deny-Override → Policy B wins (Deny)
+```
+
+---
+
+## 13. Quick Reference
+
+### Action Format
+```
+<service>:<resource-type>:<operation>
+Example: payment-service:transaction:create
+```
+
+### Resource Format
+```
+<service>:<resource-type>:<resource-id>
+Example: api:users:123
+Hierarchical: api:departments:123/users:456
+```
+
+### Wildcards
+```
+*             Match anything in segment
+prefix-*      Match starts with "prefix-"
+*-suffix      Match ends with "-suffix"
+```
+
+### Operators
+```
+StringEquals, StringNotEquals, StringLike
+NumericLessThan, NumericGreaterThanEquals
+Bool, IpAddress
+DateGreaterThan, DateLessThan
+```
+
+### Evaluation
+```
+1. Match Action + Resource + Condition
+2. Any Deny? → DENY
+3. Any Allow? → ALLOW
+4. Else → DENY
+```
+
+---
+
+## Summary
+
+**3 thành phần chính:**
+1. **Action** = Operations (service:type:operation)
+2. **Resource** = Scope (service:type:id, support wildcards)
+3. **Condition** = Runtime validation (dynamic attributes)
+
+**Evaluation:**
+- Filter policies by Action/Resource matching
+- Check Conditions với runtime context
+- Combine với Deny-Override (Deny wins)
+
+**Implementation priority:**
+1. Core matching (Action, Resource)
+2. Condition evaluators
+3. Combining algorithm
+4. Error handling & logging
+
+**Optimize sau khi chạy được:**
+- Caching (evaluation results)
+- Indexing (fast policy lookup)
+- Pre-compilation (wildcard patterns)
