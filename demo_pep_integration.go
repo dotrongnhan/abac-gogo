@@ -33,12 +33,15 @@ func runBasicPEPDemo() {
 	fmt.Println("--------------------------")
 
 	// Initialize components
-	mockStorage, err := storage.NewMockStorage(".")
+	// Use PostgreSQL storage for demo
+	dbConfig := storage.DefaultDatabaseConfig()
+	pgStorage, err := storage.NewPostgreSQLStorage(dbConfig)
 	if err != nil {
-		log.Fatalf("Failed to initialize storage: %v", err)
+		log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
 	}
+	defer pgStorage.Close()
 
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
 	auditLogger, _ := pep.NewSimpleAuditLogger("demo_audit.log")
 
 	// Create simple PEP
@@ -121,8 +124,9 @@ func runHTTPMiddlewareDemo() {
 	fmt.Println("--------------------------")
 
 	// Setup PEP
-	mockStorage, _ := storage.NewMockStorage(".")
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pgStorage, _ := storage.NewPostgreSQLStorage(storage.DefaultDatabaseConfig())
+	defer pgStorage.Close()
+	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
 	auditLogger, _ := pep.NewSimpleAuditLogger("demo_middleware_audit.log")
 	pepInstance := pep.NewSimplePolicyEnforcementPoint(pdp, auditLogger, nil)
 
@@ -187,8 +191,9 @@ func runServiceIntegrationDemo() {
 	fmt.Println("------------------------------")
 
 	// Setup PEP
-	mockStorage, _ := storage.NewMockStorage(".")
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pgStorage, _ := storage.NewPostgreSQLStorage(storage.DefaultDatabaseConfig())
+	defer pgStorage.Close()
+	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
 	auditLogger, _ := pep.NewSimpleAuditLogger("demo_service_audit.log")
 	pepInstance := pep.NewSimplePolicyEnforcementPoint(pdp, auditLogger, nil)
 

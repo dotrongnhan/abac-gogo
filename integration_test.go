@@ -11,11 +11,12 @@ import (
 )
 
 func TestFullSystemIntegration(t *testing.T) {
-	// Initialize the full system
-	mockStorage, err := storage.NewMockStorage(".")
-	if err != nil {
-		t.Fatalf("Failed to initialize storage: %v", err)
-	}
+	// Initialize the full system with PostgreSQL storage
+	testStorage := storage.NewTestStorage(t)
+	defer storage.CleanupTestStorage(t, testStorage)
+
+	// Seed test data
+	storage.SeedTestData(t, testStorage)
 
 	auditLogger, err := audit.NewAuditLogger("")
 	if err != nil {
@@ -23,7 +24,7 @@ func TestFullSystemIntegration(t *testing.T) {
 	}
 	defer auditLogger.Close()
 
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
 
 	// Test scenarios from the JSON data
 	testScenarios := []struct {
@@ -90,9 +91,9 @@ func TestFullSystemIntegration(t *testing.T) {
 			}
 
 			// Log the evaluation
-			subject, _ := mockStorage.GetSubject(scenario.request.SubjectID)
-			resource, _ := mockStorage.GetResource(scenario.request.ResourceID)
-			action, _ := mockStorage.GetAction(scenario.request.Action)
+			subject, _ := testStorage.GetSubject(scenario.request.SubjectID)
+			resource, _ := testStorage.GetResource(scenario.request.ResourceID)
+			action, _ := testStorage.GetAction(scenario.request.Action)
 
 			auditContext := &models.EvaluationContext{
 				Subject:     subject,
@@ -118,10 +119,9 @@ func TestFullSystemIntegration(t *testing.T) {
 }
 
 func TestSecurityScenarios(t *testing.T) {
-	mockStorage, err := storage.NewMockStorage(".")
-	if err != nil {
-		t.Fatalf("Failed to initialize storage: %v", err)
-	}
+	testStorage := storage.NewTestStorage(t)
+	defer storage.CleanupTestStorage(t, testStorage)
+	storage.SeedTestData(t, testStorage)
 
 	auditLogger, err := audit.NewAuditLogger("")
 	if err != nil {
@@ -129,7 +129,7 @@ func TestSecurityScenarios(t *testing.T) {
 	}
 	defer auditLogger.Close()
 
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
 
 	securityTests := []struct {
 		name        string
@@ -212,13 +212,12 @@ func TestSecurityScenarios(t *testing.T) {
 }
 
 func TestDataConsistency(t *testing.T) {
-	mockStorage, err := storage.NewMockStorage(".")
-	if err != nil {
-		t.Fatalf("Failed to initialize storage: %v", err)
-	}
+	testStorage := storage.NewTestStorage(t)
+	defer storage.CleanupTestStorage(t, testStorage)
+	storage.SeedTestData(t, testStorage)
 
 	// Test that all referenced entities exist
-	policies, err := mockStorage.GetPolicies()
+	policies, err := testStorage.GetPolicies()
 	if err != nil {
 		t.Fatalf("Failed to get policies: %v", err)
 	}
@@ -226,7 +225,7 @@ func TestDataConsistency(t *testing.T) {
 	for _, policy := range policies {
 		// Check that all actions in policy exist
 		for _, actionName := range policy.Actions {
-			_, err := mockStorage.GetAction(actionName)
+			_, err := testStorage.GetAction(actionName)
 			if err != nil {
 				t.Errorf("Policy %s references non-existent action: %s", policy.ID, actionName)
 			}
@@ -270,7 +269,7 @@ func TestDataConsistency(t *testing.T) {
 	}
 
 	// Test subjects
-	subjects, err := mockStorage.GetAllSubjects()
+	subjects, err := testStorage.GetAllSubjects()
 	if err != nil {
 		t.Fatalf("Failed to get subjects: %v", err)
 	}
@@ -298,7 +297,7 @@ func TestDataConsistency(t *testing.T) {
 	}
 
 	// Test resources
-	resources, err := mockStorage.GetAllResources()
+	resources, err := testStorage.GetAllResources()
 	if err != nil {
 		t.Fatalf("Failed to get resources: %v", err)
 	}
@@ -322,12 +321,11 @@ func TestDataConsistency(t *testing.T) {
 }
 
 func TestConcurrentEvaluations(t *testing.T) {
-	mockStorage, err := storage.NewMockStorage(".")
-	if err != nil {
-		t.Fatalf("Failed to initialize storage: %v", err)
-	}
+	testStorage := storage.NewTestStorage(t)
+	defer storage.CleanupTestStorage(t, testStorage)
+	storage.SeedTestData(t, testStorage)
 
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
 
 	// Create multiple evaluation requests
 	requests := make([]*models.EvaluationRequest, 100)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -146,11 +147,13 @@ func corsMiddleware() gin.HandlerFunc {
 func main() {
 	fmt.Println("🚀 Starting ABAC HTTP Service with Gin...")
 
-	// Khởi tạo storage
-	storage, err := storage.NewMockStorage(".")
+	// Khởi tạo PostgreSQL storage
+	dbConfig := storage.DefaultDatabaseConfig()
+	storage, err := storage.NewPostgreSQLStorage(dbConfig)
 	if err != nil {
-		log.Fatalf("Failed to initialize storage: %v", err)
+		log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
 	}
+	defer storage.Close()
 
 	// Khởi tạo PDP
 	pdp := evaluator.NewPolicyDecisionPoint(storage)
@@ -229,7 +232,7 @@ func main() {
 	fmt.Println("  sub-003: Payment Service - Service account")
 	fmt.Println("  sub-004: Bob Wilson (On probation) - Limited access")
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 

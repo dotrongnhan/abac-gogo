@@ -64,6 +64,25 @@ func (m *mockStorage) GetAllActions() ([]*models.Action, error) {
 	return actions, nil
 }
 
+// Additional methods to implement Storage interface
+func (m *mockStorage) CreateSubject(subject *models.Subject) error    { return nil }
+func (m *mockStorage) CreateResource(resource *models.Resource) error { return nil }
+func (m *mockStorage) CreateAction(action *models.Action) error       { return nil }
+func (m *mockStorage) CreatePolicy(policy *models.Policy) error       { return nil }
+func (m *mockStorage) UpdateSubject(subject *models.Subject) error    { return nil }
+func (m *mockStorage) UpdateResource(resource *models.Resource) error { return nil }
+func (m *mockStorage) UpdateAction(action *models.Action) error       { return nil }
+func (m *mockStorage) UpdatePolicy(policy *models.Policy) error       { return nil }
+func (m *mockStorage) DeleteSubject(id string) error                  { return nil }
+func (m *mockStorage) DeleteResource(id string) error                 { return nil }
+func (m *mockStorage) DeleteAction(id string) error                   { return nil }
+func (m *mockStorage) DeletePolicy(id string) error                   { return nil }
+func (m *mockStorage) LogAudit(auditLog *models.AuditLog) error       { return nil }
+func (m *mockStorage) GetAuditLogs(limit, offset int) ([]*models.AuditLog, error) {
+	return []*models.AuditLog{}, nil
+}
+func (m *mockStorage) Close() error { return nil }
+
 func createTestStorage() *mockStorage {
 	return &mockStorage{
 		subjects: map[string]*models.Subject{

@@ -14,13 +14,14 @@ import (
 // ExampleWebServer demonstrates PEP integration with HTTP server
 func ExampleWebServer() {
 	// Initialize storage (use your preferred storage)
-	mockStorage, err := storage.NewMockStorage(".")
+	pgStorage, err := storage.NewPostgreSQLStorage(storage.DefaultDatabaseConfig())
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize storage: %v", err))
 	}
+	defer pgStorage.Close()
 
 	// Initialize PDP
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
 
 	// Initialize audit logger
 	auditLogger, err := NewSimpleAuditLogger("./audit.log")
@@ -61,8 +62,12 @@ func ExampleWebServer() {
 // ExampleServiceIntegration demonstrates PEP integration with business services
 func ExampleServiceIntegration() {
 	// Initialize components
-	mockStorage, _ := storage.NewMockStorage(".")
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pgStorage, err := storage.NewPostgreSQLStorage(storage.DefaultDatabaseConfig())
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize storage: %v", err))
+	}
+	defer pgStorage.Close()
+	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
 	auditLogger, _ := NewSimpleAuditLogger("./audit.log")
 
 	config := &PEPConfig{
@@ -102,8 +107,12 @@ func ExampleServiceIntegration() {
 // ExampleDatabaseIntegration demonstrates PEP integration with database operations
 func ExampleDatabaseIntegration() {
 	// Initialize components
-	mockStorage, _ := storage.NewMockStorage(".")
-	pdp := evaluator.NewPolicyDecisionPoint(mockStorage)
+	pgStorage, err := storage.NewPostgreSQLStorage(storage.DefaultDatabaseConfig())
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize storage: %v", err))
+	}
+	defer pgStorage.Close()
+	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
 	auditLogger, _ := NewSimpleAuditLogger("./audit.log")
 
 	config := &PEPConfig{
@@ -121,7 +130,7 @@ func ExampleDatabaseIntegration() {
 	ctx := context.Background()
 
 	// Example database operations with access control
-	err := dbService.QueryUsers(ctx, "sub-001")
+	err = dbService.QueryUsers(ctx, "sub-001")
 	if err != nil {
 		fmt.Printf("Query failed: %v\n", err)
 	}

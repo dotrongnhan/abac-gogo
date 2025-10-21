@@ -4,12 +4,36 @@ Hệ thống **Attribute-Based Access Control (ABAC)** được triển khai dư
 
 ## 🚀 Khởi Chạy Nhanh
 
+### Prerequisites
+- PostgreSQL database running
+- Go 1.19+ installed
+
+### Setup Database
+```bash
+# Create database
+createdb abac_system
+
+# Set environment variables (optional)
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=postgres
+export DB_PASSWORD=postgres
+export DB_NAME=abac_system
+```
+
+### Run Service
 ```bash
 # Clone repository
 git clone <repository-url>
 cd ABAC-gogo-example
 
-# Chạy service
+# Install dependencies
+go mod tidy
+
+# Run database migration and seed data
+go run cmd/migrate/main.go
+
+# Start service
 go run main.go
 
 # Service sẽ chạy trên http://localhost:8081
@@ -130,12 +154,25 @@ curl http://localhost:8081/api/v1/users
 
 ## 🔧 Configuration
 
-Service sử dụng JSON files để cấu hình:
+Service sử dụng PostgreSQL database để lưu trữ:
 
-- **`subjects.json`** - Danh sách users và attributes
-- **`resources.json`** - Danh sách resources và properties
-- **`actions.json`** - Các actions có thể thực hiện
-- **`policies.json`** - ABAC policies và rules
+- **`subjects` table** - Danh sách users và attributes
+- **`resources` table** - Danh sách resources và properties  
+- **`actions` table** - Các actions có thể thực hiện
+- **`policies` table** - ABAC policies và rules
+- **`audit_logs` table** - Audit trail
+
+### Database Configuration
+```bash
+# Environment variables
+DB_HOST=localhost          # Database host
+DB_PORT=5432              # Database port
+DB_USER=postgres          # Database user
+DB_PASSWORD=postgres      # Database password
+DB_NAME=abac_system       # Database name
+DB_SSL_MODE=disable       # SSL mode
+DB_TIMEZONE=UTC           # Timezone
+```
 
 ## 🚦 ABAC Decision Logic
 
@@ -149,18 +186,18 @@ Service sử dụng JSON files để cấu hình:
 
 1. Thêm handler function
 2. Đăng ký route với ABAC middleware
-3. Thêm resource vào `resources.json`
-4. Tạo policy trong `policies.json`
+3. Insert resource vào `resources` table
+4. Insert policy vào `policies` table
 
 ### Thêm User Mới
 
-1. Thêm subject vào `subjects.json`
-2. Định nghĩa attributes (department, role, clearance_level, etc.)
+1. Insert subject vào `subjects` table
+2. Định nghĩa attributes trong JSONB column (department, role, clearance_level, etc.)
 
 ### Thêm Policy Mới
 
-1. Thêm policy vào `policies.json`
-2. Định nghĩa rules với target_type, attribute_path, operator, expected_value
+1. Insert policy vào `policies` table
+2. Định nghĩa rules trong JSONB column với target_type, attribute_path, operator, expected_value
 
 ## 📝 Logs
 
@@ -174,10 +211,11 @@ Service ghi log các ABAC decisions:
 
 ### Common Issues
 
-1. **"resource not found"** - Kiểm tra `resources.json` có resource với đúng `resource_id`
-2. **"subject not found"** - Kiểm tra `subjects.json` có subject với đúng ID
-3. **"Authorization error"** - Kiểm tra policies và rules trong `policies.json`
+1. **"resource not found"** - Kiểm tra `resources` table có resource với đúng `resource_id`
+2. **"subject not found"** - Kiểm tra `subjects` table có subject với đúng ID
+3. **"Authorization error"** - Kiểm tra policies và rules trong `policies` table
 4. **"Missing X-Subject-ID header"** - Thêm header vào request
+5. **"Database connection failed"** - Kiểm tra PostgreSQL service và connection string
 
 ### Debug
 
@@ -190,11 +228,12 @@ curl http://localhost:8081/debug/routes
 ## 🎯 Production Considerations
 
 1. **Authentication** - Thay thế `X-Subject-ID` header bằng JWT token
-2. **Database** - Chuyển từ JSON files sang PostgreSQL
+2. **Database Optimization** - Connection pooling, read replicas, indexing
 3. **Caching** - Thêm Redis cache cho decisions
 4. **Monitoring** - Thêm metrics và alerting
 5. **Rate Limiting** - Implement rate limiting per user
 6. **HTTPS** - Sử dụng TLS trong production
+7. **Database Backup** - Regular backup và disaster recovery
 
 ## 📚 Tài Liệu Khác
 
