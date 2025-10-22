@@ -30,9 +30,8 @@ evaluator/
 
 ```go
 type PolicyDecisionPointInterface interface {
-    // Main evaluation methods
+    // Optimized evaluation method combining best practices
     Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
-    EvaluateNew(request *models.EvaluationRequest) (*models.Decision, error)
 }
 ```
 
@@ -494,8 +493,8 @@ if request.SubjectID == "" || request.ResourceID == "" {
 // Create PDP instance using interface (recommended)
 var pdp PolicyDecisionPointInterface = NewPolicyDecisionPoint(storage)
 
-// Use the interface methods
-decision, err := pdp.EvaluateNew(request)
+// Use the optimized evaluation method
+decision, err := pdp.Evaluate(request)
 if err != nil {
     log.Fatal(err)
 }
@@ -508,13 +507,10 @@ if err != nil {
 func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterface
 ```
 
-### Main Evaluation Methods
+### Main Evaluation Method
 
 ```go
-// New policy format (recommended)
-func (pdp *PolicyDecisionPoint) EvaluateNew(request *models.EvaluationRequest) (*models.Decision, error)
-
-// Legacy support
+// Optimized evaluation combining best practices from legacy approaches
 func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
 ```
 
@@ -534,9 +530,7 @@ func (m *MockPDP) Evaluate(req *models.EvaluationRequest) (*models.Decision, err
     return &models.Decision{Result: "deny"}, nil
 }
 
-func (m *MockPDP) EvaluateNew(req *models.EvaluationRequest) (*models.Decision, error) {
-    return m.Evaluate(req)
-}
+// MockPDP now only needs to implement Evaluate method
 
 // Usage in tests
 func TestSomeFeature(t *testing.T) {

@@ -41,8 +41,8 @@
 - ✅ `filterApplicablePolicies()` - Legacy filtering logic
 - ✅ `evaluatePolicies()` - Legacy evaluation logic
 
-#### **New Methods Added**
-- ✅ `EvaluateNew()` - New evaluation using PolicyStatement format
+#### **Optimized Methods**
+- ✅ `Evaluate()` - Unified evaluation combining best practices from legacy approaches
 - ✅ `evaluateNewPolicies()` - Deny-Override algorithm implementation
 - ✅ `evaluateStatement()` - Statement-level evaluation
 - ✅ `matchAction()` / `matchResource()` - New matching logic

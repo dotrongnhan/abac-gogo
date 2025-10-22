@@ -11,10 +11,9 @@ import (
 	"abac_go_example/storage"
 )
 
-// PolicyDecisionPointInterface defines the legacy interface for backward compatibility
+// PolicyDecisionPointInterface defines the interface for policy evaluation
 type PolicyDecisionPointInterface interface {
 	Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
-	EvaluateNew(request *models.EvaluationRequest) (*models.Decision, error)
 }
 
 // EnhancedPolicyDecisionPoint interface defines clear contract for enhanced PDP
@@ -52,40 +51,18 @@ func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterfac
 	}
 }
 
-// Evaluate performs policy evaluation for a given request
+// Evaluate performs optimized policy evaluation for a given request
+// This unified method combines the best practices from both legacy approaches
 func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*models.Decision, error) {
 	startTime := time.Now()
 
-	// Step 1: Enrich context with all necessary attributes
-	context, err := pdp.attributeResolver.EnrichContext(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to enrich context: %w", err)
+	// Input validation
+	if request == nil {
+		return nil, fmt.Errorf("evaluation request cannot be nil")
 	}
-
-	// Step 2: Get all policies
-	allPolicies, err := pdp.storage.GetPolicies()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get policies: %w", err)
+	if request.SubjectID == "" || request.ResourceID == "" || request.Action == "" {
+		return nil, fmt.Errorf("invalid request: missing required fields (SubjectID, ResourceID, Action)")
 	}
-
-	// Step 3: Use new evaluation method
-	evalContext := pdp.buildEvaluationContext(&models.EvaluationRequest{
-		SubjectID:  context.Subject.ID,
-		ResourceID: context.Resource.ResourceID,
-		Action:     context.Action.ActionName,
-	}, context)
-	decision := pdp.evaluateNewPolicies(allPolicies, evalContext)
-
-	// Step 4: Calculate evaluation time
-	evaluationTime := int(time.Since(startTime).Milliseconds())
-	decision.EvaluationTimeMs = evaluationTime
-
-	return decision, nil
-}
-
-// EvaluateNew performs policy evaluation using the new JSON policy format
-func (pdp *PolicyDecisionPoint) EvaluateNew(request *models.EvaluationRequest) (*models.Decision, error) {
-	startTime := time.Now()
 
 	// Step 1: Enrich context with all necessary attributes
 	context, err := pdp.attributeResolver.EnrichContext(request)
@@ -99,7 +76,8 @@ func (pdp *PolicyDecisionPoint) EvaluateNew(request *models.EvaluationRequest) (
 		return nil, fmt.Errorf("failed to get policies: %w", err)
 	}
 
-	// Step 3: Build evaluation context for new format
+	// Step 3: Build evaluation context using original request (preserves all context)
+	// This approach maintains data integrity from EvaluateNew while adding validation
 	evalContext := pdp.buildEvaluationContext(request, context)
 
 	// Step 4: Evaluate policies with Deny-Override algorithm
