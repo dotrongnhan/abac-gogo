@@ -20,7 +20,7 @@ import (
 
 // ABACService - HTTP service với ABAC authorization
 type ABACService struct {
-	pdp     *evaluator.PolicyDecisionPoint
+	pdp     evaluator.PolicyDecisionPointInterface
 	storage storage.Storage
 }
 

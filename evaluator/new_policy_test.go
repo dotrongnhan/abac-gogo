@@ -67,8 +67,8 @@ func TestResourceMatcher(t *testing.T) {
 		{"*", "anything", true},
 
 		// Variable substitution
-		{"api:documents:owner:${request:UserId}/*", "api:documents:owner:user-123/file-1", true},
-		{"api:documents:dept:${user:Department}/*", "api:documents:dept:engineering/file-1", true},
+		{"api:documents:owner-${request:UserId}", "api:documents:owner-user-123", true},
+		{"api:departments:${user:Department}/api:documents:*", "api:departments:engineering/api:documents:file-1", true},
 
 		// Prefix wildcards
 		{"api:documents:admin-*", "api:documents:admin-123", true},
@@ -372,5 +372,84 @@ func TestDenyOverrideAlgorithm(t *testing.T) {
 				t.Errorf("Decision.Result = %v, want %v", decision.Result, test.expected)
 			}
 		})
+	}
+}
+
+func TestNotResourceExclusion(t *testing.T) {
+	matcher := NewResourceMatcher()
+
+	context := map[string]interface{}{
+		"request:ResourceId": "api:admin:admin-123",
+	}
+
+	// Test NotResource exclusion
+	statement := models.PolicyStatement{
+		Sid:      "GlobalWithExclusion",
+		Effect:   "Allow",
+		Action:   models.JSONActionResource{Single: "*:*:read"},
+		Resource: models.JSONActionResource{Single: "api:*:*"},
+		NotResource: models.JSONActionResource{
+			IsArray:  true,
+			Multiple: []string{"api:admin:*", "api:system:*"},
+		},
+	}
+
+	// This should be excluded by NotResource
+	resourceMatches := false
+	resourceValues := statement.Resource.GetValues()
+	for _, resourcePattern := range resourceValues {
+		if matcher.Match(resourcePattern, context["request:ResourceId"].(string), context) {
+			resourceMatches = true
+			break
+		}
+	}
+
+	if !resourceMatches {
+		t.Error("Resource should match the main pattern")
+	}
+
+	// Check NotResource exclusions
+	excluded := false
+	notResourceValues := statement.NotResource.GetValues()
+	for _, notResourcePattern := range notResourceValues {
+		if matcher.Match(notResourcePattern, context["request:ResourceId"].(string), context) {
+			excluded = true
+			break
+		}
+	}
+
+	if !excluded {
+		t.Error("Resource should be excluded by NotResource pattern")
+	}
+}
+
+func TestResourceFormatValidation(t *testing.T) {
+	matcher := NewResourceMatcher()
+
+	tests := []struct {
+		resource string
+		valid    bool
+	}{
+		// Valid formats
+		{"api:users:123", true},
+		{"api:documents:*", true},
+		{"api:departments:dept-123", true},
+		{"api:departments:123/api:documents:456", true},
+		{"*", true},
+
+		// Invalid formats
+		{"users:123", false}, // Missing service
+		{"api:users", false}, // Missing resource-id
+		{"api::123", false},  // Empty resource-type
+		{"", false},          // Empty string
+		{"api:", false},      // Incomplete
+	}
+
+	for _, test := range tests {
+		result := matcher.validateResourceFormat(test.resource)
+		if result != test.valid {
+			t.Errorf("validateResourceFormat(%q) = %v, want %v",
+				test.resource, result, test.valid)
+		}
 	}
 }

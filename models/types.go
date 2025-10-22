@@ -295,11 +295,12 @@ type PolicyRule struct {
 
 // PolicyStatement represents a statement in the new policy format
 type PolicyStatement struct {
-	Sid       string             `json:"Sid,omitempty"`       // Statement ID for debugging
-	Effect    string             `json:"Effect"`              // "Allow" or "Deny"
-	Action    JSONActionResource `json:"Action"`              // string or []string
-	Resource  JSONActionResource `json:"Resource"`            // string or []string
-	Condition JSONMap            `json:"Condition,omitempty"` // Runtime conditions
+	Sid         string             `json:"Sid,omitempty"`         // Statement ID for debugging
+	Effect      string             `json:"Effect"`                // "Allow" or "Deny"
+	Action      JSONActionResource `json:"Action"`                // string or []string
+	Resource    JSONActionResource `json:"Resource"`              // string or []string
+	NotResource JSONActionResource `json:"NotResource,omitempty"` // Exclusion patterns
+	Condition   JSONMap            `json:"Condition,omitempty"`   // Runtime conditions
 }
 
 // PolicyDocument represents the complete policy document

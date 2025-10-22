@@ -78,8 +78,18 @@ func (rm *ResourceMatcher) Match(pattern, resource string, context map[string]in
 		return true
 	}
 
+	// Validate resource format before matching
+	if !rm.validateResourceFormat(resource) {
+		return false
+	}
+
 	// Substitute variables in pattern
 	expandedPattern := rm.substituteVariables(pattern, context)
+
+	// Validate expanded pattern format (after variable substitution)
+	if !rm.validateResourceFormat(expandedPattern) && expandedPattern != "*" {
+		return false
+	}
 
 	// Handle hierarchical resources
 	if strings.Contains(expandedPattern, "/") || strings.Contains(resource, "/") {
@@ -153,6 +163,60 @@ func (rm *ResourceMatcher) matchWildcard(pattern, value string) bool {
 	}
 
 	return regex.MatchString(value)
+}
+
+// hasVariables checks if a string contains variable substitutions
+func (rm *ResourceMatcher) hasVariables(str string) bool {
+	return strings.Contains(str, "${") && strings.Contains(str, "}")
+}
+
+// validateResourceFormat validates resource format according to specification
+// Format: <service>:<resource-type>:<resource-id> or hierarchical with '/'
+func (rm *ResourceMatcher) validateResourceFormat(resource string) bool {
+	if resource == "*" {
+		return true
+	}
+
+	// Skip validation if resource contains variables (validate after substitution)
+	if rm.hasVariables(resource) {
+		return true
+	}
+
+	// Handle hierarchical resources
+	if strings.Contains(resource, "/") {
+		parts := strings.Split(resource, "/")
+		for _, part := range parts {
+			if !rm.validateSimpleResourceFormat(part) {
+				return false
+			}
+		}
+		return true
+	}
+
+	return rm.validateSimpleResourceFormat(resource)
+}
+
+// validateSimpleResourceFormat validates simple resource format (no hierarchy)
+func (rm *ResourceMatcher) validateSimpleResourceFormat(resource string) bool {
+	parts := strings.Split(resource, ":")
+
+	// Must have at least 3 parts: service:type:id
+	if len(parts) < 3 {
+		return false
+	}
+
+	// No empty segments (except wildcards)
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		// Allow variables in format ${...}
+		if strings.HasPrefix(part, "${") && strings.HasSuffix(part, "}") {
+			continue
+		}
+	}
+
+	return true
 }
 
 // substituteVariables replaces ${...} variables in pattern
