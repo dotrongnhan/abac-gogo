@@ -211,7 +211,8 @@ func (rm *ResourceMatcher) validateSimpleResourceFormat(resource string) bool {
 			return false
 		}
 		// Allow variables in format ${...}
-		if strings.HasPrefix(part, "${") && strings.HasSuffix(part, "}") {
+		isVariable := strings.HasPrefix(part, "${") && strings.HasSuffix(part, "}")
+		if isVariable {
 			continue
 		}
 	}

@@ -284,13 +284,15 @@ func (Policy) TableName() string {
 
 // PolicyRule represents a single rule within a policy (legacy format)
 type PolicyRule struct {
-	ID            string      `json:"id,omitempty"`
-	TargetType    string      `json:"target_type"`    // "subject", "resource", "action", "environment"
-	AttributePath string      `json:"attribute_path"` // e.g., "attributes.department"
-	Operator      string      `json:"operator"`       // "eq", "in", "contains", "regex", etc.
-	ExpectedValue interface{} `json:"expected_value"`
-	IsNegative    bool        `json:"is_negative,omitempty"`
-	RuleOrder     int         `json:"rule_order,omitempty"`
+	ID            string             `json:"id,omitempty"`
+	TargetType    string             `json:"target_type"`    // "subject", "resource", "action", "environment"
+	AttributePath string             `json:"attribute_path"` // e.g., "attributes.department"
+	Operator      string             `json:"operator"`       // "eq", "in", "contains", "regex", etc.
+	ExpectedValue interface{}        `json:"expected_value"`
+	IsNegative    bool               `json:"is_negative,omitempty"`
+	RuleOrder     int                `json:"rule_order,omitempty"`
+	TimeWindows   []TimeWindow       `json:"time_windows,omitempty"`
+	Location      *LocationCondition `json:"location,omitempty"`
 }
 
 // PolicyStatement represents a statement in the new policy format
@@ -333,6 +335,117 @@ type Decision struct {
 	MatchedPolicies  []string `json:"matched_policies"`
 	EvaluationTimeMs int      `json:"evaluation_time_ms"`
 	Reason           string   `json:"reason,omitempty"`
+}
+
+// Enhanced decision types for improved PDP
+type DecisionType string
+
+const (
+	DecisionPermit        DecisionType = "PERMIT"
+	DecisionDeny          DecisionType = "DENY"
+	DecisionNotApplicable DecisionType = "NOT_APPLICABLE"
+	DecisionIndeterminate DecisionType = "INDETERMINATE"
+)
+
+// DecisionRequest represents input to enhanced PDP
+type DecisionRequest struct {
+	Subject     *Subject               `json:"subject"`
+	Resource    *Resource              `json:"resource"`
+	Action      *Action                `json:"action"`
+	Environment *Environment           `json:"environment"`
+	Context     map[string]interface{} `json:"context"`
+	RequestID   string                 `json:"request_id,omitempty"`
+}
+
+// DecisionResponse represents enhanced PDP output
+type DecisionResponse struct {
+	Decision    DecisionType  `json:"decision"`
+	Reason      string        `json:"reason"`
+	Policies    []string      `json:"applicable_policies"`
+	EvaluatedAt time.Time     `json:"evaluated_at"`
+	Duration    time.Duration `json:"evaluation_duration"`
+	RequestID   string        `json:"request_id,omitempty"`
+}
+
+// Environment represents environmental attributes for policy evaluation
+type Environment struct {
+	Timestamp  time.Time              `json:"timestamp"`
+	ClientIP   string                 `json:"client_ip,omitempty"`
+	UserAgent  string                 `json:"user_agent,omitempty"`
+	Location   *LocationInfo          `json:"location,omitempty"`
+	TimeOfDay  string                 `json:"time_of_day,omitempty"`
+	DayOfWeek  string                 `json:"day_of_week,omitempty"`
+	Attributes map[string]interface{} `json:"attributes,omitempty"`
+}
+
+// LocationInfo represents geographical location information
+type LocationInfo struct {
+	Country   string  `json:"country,omitempty"`
+	Region    string  `json:"region,omitempty"`
+	City      string  `json:"city,omitempty"`
+	Latitude  float64 `json:"latitude,omitempty"`
+	Longitude float64 `json:"longitude,omitempty"`
+}
+
+// GetClientIP returns the client IP address
+func (e *Environment) GetClientIP() string {
+	return e.ClientIP
+}
+
+// GetLatitude returns the latitude
+func (e *Environment) GetLatitude() float64 {
+	if e.Location != nil {
+		return e.Location.Latitude
+	}
+	return 0
+}
+
+// GetLongitude returns the longitude
+func (e *Environment) GetLongitude() float64 {
+	if e.Location != nil {
+		return e.Location.Longitude
+	}
+	return 0
+}
+
+// TimeWindow represents time-based access control
+type TimeWindow struct {
+	StartTime    string   `json:"start_time"`    // "09:00"
+	EndTime      string   `json:"end_time"`      // "17:00"
+	DaysOfWeek   []string `json:"days_of_week"`  // ["monday", "tuesday"]
+	Timezone     string   `json:"timezone"`      // "Asia/Ho_Chi_Minh"
+	ExcludeDates []string `json:"exclude_dates"` // ["2025-12-25", "2025-01-01"]
+}
+
+// LocationCondition represents location-based access control
+type LocationCondition struct {
+	AllowedCountries []string           `json:"allowed_countries,omitempty"`
+	AllowedRegions   []string           `json:"allowed_regions,omitempty"`
+	IPRanges         []string           `json:"ip_ranges,omitempty"`
+	GeoFencing       *GeoFenceCondition `json:"geo_fencing,omitempty"`
+}
+
+// GeoFenceCondition represents geographical fencing
+type GeoFenceCondition struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Radius    float64 `json:"radius_km"`
+}
+
+// BooleanExpression represents complex boolean expressions
+type BooleanExpression struct {
+	Type      string             `json:"type"`               // "simple" or "compound"
+	Operator  string             `json:"operator,omitempty"` // "and", "or", "not"
+	Condition *SimpleCondition   `json:"condition,omitempty"`
+	Left      *BooleanExpression `json:"left,omitempty"`
+	Right     *BooleanExpression `json:"right,omitempty"`
+}
+
+// SimpleCondition represents a simple condition
+type SimpleCondition struct {
+	AttributePath string      `json:"attribute_path"` // "user.department"
+	Operator      string      `json:"operator"`       // "eq", "gt", "in"
+	Value         interface{} `json:"value"`
 }
 
 // AuditLog represents an audit log entry

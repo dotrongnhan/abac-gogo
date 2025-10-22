@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -10,10 +11,25 @@ import (
 	"abac_go_example/storage"
 )
 
+// PolicyDecisionPointInterface defines the legacy interface for backward compatibility
 type PolicyDecisionPointInterface interface {
 	Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
-
 	EvaluateNew(request *models.EvaluationRequest) (*models.Decision, error)
+}
+
+// EnhancedPolicyDecisionPoint interface defines clear contract for enhanced PDP
+type EnhancedPolicyDecisionPoint interface {
+	// Core evaluation method with context support
+	Evaluate(ctx context.Context, req *models.DecisionRequest) (*models.DecisionResponse, error)
+
+	// Policy validation before storing
+	ValidatePolicy(policy *models.Policy) error
+
+	// Get applicable policies for debugging/auditing
+	GetApplicablePolicies(ctx context.Context, req *models.DecisionRequest) ([]*models.Policy, error)
+
+	// Health check for PDP component
+	HealthCheck(ctx context.Context) error
 }
 
 // PolicyDecisionPoint (PDP) is the main evaluation engine

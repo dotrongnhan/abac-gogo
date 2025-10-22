@@ -16,7 +16,7 @@ type AuditLogger interface {
 
 // SimplePolicyEnforcementPoint is a simplified version of PEP without advanced features
 type SimplePolicyEnforcementPoint struct {
-	pdp         *evaluator.PolicyDecisionPoint
+	pdp         evaluator.PolicyDecisionPointInterface
 	auditLogger AuditLogger
 	config      *PEPConfig
 	metrics     *SimplePEPMetrics
@@ -32,7 +32,7 @@ type SimplePEPMetrics struct {
 }
 
 // NewSimplePolicyEnforcementPoint creates a new simplified PEP instance
-func NewSimplePolicyEnforcementPoint(pdp *evaluator.PolicyDecisionPoint, auditLogger AuditLogger, config *PEPConfig) *SimplePolicyEnforcementPoint {
+func NewSimplePolicyEnforcementPoint(pdp evaluator.PolicyDecisionPointInterface, auditLogger AuditLogger, config *PEPConfig) *SimplePolicyEnforcementPoint {
 	if config == nil {
 		config = &PEPConfig{
 			FailSafeMode:      true,
