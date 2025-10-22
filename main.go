@@ -18,6 +18,101 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func main() {
+	fmt.Println("🚀 Starting ABAC HTTP Service with Gin...")
+
+	// Khởi tạo PostgreSQL storage
+	dbConfig := storage.DefaultDatabaseConfig()
+	storage, err := storage.NewPostgreSQLStorage(dbConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
+	}
+	defer storage.Close()
+
+	// Khởi tạo PDP
+	pdp := evaluator.NewPolicyDecisionPoint(storage)
+
+	// Khởi tạo service
+	service := &ABACService{
+		pdp:     pdp,
+		storage: storage,
+	}
+
+	// Setup Gin router
+	router := gin.Default()
+
+	// CORS middleware
+	router.Use(corsMiddleware())
+
+	// Health check (không cần authorization)
+	router.GET("/health", handleHealth)
+
+	// Protected endpoints với ABAC middleware
+	apiV1 := router.Group("/api/v1")
+	{
+		apiV1.GET("/users", service.ABACMiddleware("read"), service.handleUsers)
+		apiV1.POST("/users/create", service.ABACMiddleware("write"), service.handleCreateUser)
+		apiV1.GET("/financial", service.ABACMiddleware("read"), service.handleFinancialData)
+		apiV1.GET("/admin", service.ABACMiddleware("admin"), service.handleAdminPanel)
+	}
+
+	// Debug: List all routes (Gin does this automatically in debug mode)
+	// You can add a custom one if needed
+	router.GET("/debug/routes", func(c *gin.Context) {
+		routes := []gin.H{}
+		for _, r := range router.Routes() {
+			routes = append(routes, gin.H{"method": r.Method, "path": r.Path})
+		}
+		c.JSON(http.StatusOK, gin.H{"routes": routes})
+	})
+
+	// HTTP server
+	server := &http.Server{
+		Addr:    ":8081",
+		Handler: router,
+	}
+
+	// Graceful shutdown
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+
+		fmt.Println("\n🛑 Shutting down server...")
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown error: %v", err)
+		}
+	}()
+
+	// Start server
+	fmt.Println("✅ ABAC HTTP Service started on :8081")
+	fmt.Println("\n📋 Available endpoints:")
+	fmt.Println("  GET  /health                    - Health check (no auth)")
+	fmt.Println("  GET  /api/v1/users              - List users (read permission)")
+	fmt.Println("  POST /api/v1/users/create       - Create user (write permission)")
+	fmt.Println("  GET  /api/v1/financial          - Financial data (read permission)")
+	fmt.Println("  GET  /api/v1/admin              - Admin panel (admin permission)")
+	fmt.Println("\n💡 Usage examples:")
+	fmt.Println("  curl http://localhost:8081/health")
+	fmt.Println("  curl -H 'X-Subject-ID: sub-001' http://localhost:8081/api/v1/users")
+	fmt.Println("  curl -H 'X-Subject-ID: sub-002' http://localhost:8081/api/v1/financial")
+	fmt.Println("  curl -H 'X-Subject-ID: sub-004' http://localhost:8081/api/v1/users  # Should be denied")
+	fmt.Println("\n🔑 Subject IDs in test data:")
+	fmt.Println("  sub-001: John Doe (Engineering) - Can read APIs")
+	fmt.Println("  sub-002: Alice Smith (Finance) - Can read financial data")
+	fmt.Println("  sub-003: Payment Service - Service account")
+	fmt.Println("  sub-004: Bob Wilson (On probation) - Limited access")
+
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("Server failed to start: %v", err)
+	}
+
+	fmt.Println("👋 Server stopped")
+}
+
 // ABACService - HTTP service với ABAC authorization
 type ABACService struct {
 	pdp     evaluator.PolicyDecisionPointInterface
@@ -142,99 +237,4 @@ func corsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
-}
-
-func main() {
-	fmt.Println("🚀 Starting ABAC HTTP Service with Gin...")
-
-	// Khởi tạo PostgreSQL storage
-	dbConfig := storage.DefaultDatabaseConfig()
-	storage, err := storage.NewPostgreSQLStorage(dbConfig)
-	if err != nil {
-		log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
-	}
-	defer storage.Close()
-
-	// Khởi tạo PDP
-	pdp := evaluator.NewPolicyDecisionPoint(storage)
-
-	// Khởi tạo service
-	service := &ABACService{
-		pdp:     pdp,
-		storage: storage,
-	}
-
-	// Setup Gin router
-	router := gin.Default()
-
-	// CORS middleware
-	router.Use(corsMiddleware())
-
-	// Health check (không cần authorization)
-	router.GET("/health", handleHealth)
-
-	// Protected endpoints với ABAC middleware
-	apiV1 := router.Group("/api/v1")
-	{
-		apiV1.GET("/users", service.ABACMiddleware("read"), service.handleUsers)
-		apiV1.POST("/users/create", service.ABACMiddleware("write"), service.handleCreateUser)
-		apiV1.GET("/financial", service.ABACMiddleware("read"), service.handleFinancialData)
-		apiV1.GET("/admin", service.ABACMiddleware("admin"), service.handleAdminPanel)
-	}
-
-	// Debug: List all routes (Gin does this automatically in debug mode)
-	// You can add a custom one if needed
-	router.GET("/debug/routes", func(c *gin.Context) {
-		routes := []gin.H{}
-		for _, r := range router.Routes() {
-			routes = append(routes, gin.H{"method": r.Method, "path": r.Path})
-		}
-		c.JSON(http.StatusOK, gin.H{"routes": routes})
-	})
-
-	// HTTP server
-	server := &http.Server{
-		Addr:    ":8081",
-		Handler: router,
-	}
-
-	// Graceful shutdown
-	go func() {
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan
-
-		fmt.Println("\n🛑 Shutting down server...")
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := server.Shutdown(ctx); err != nil {
-			log.Printf("Server shutdown error: %v", err)
-		}
-	}()
-
-	// Start server
-	fmt.Println("✅ ABAC HTTP Service started on :8081")
-	fmt.Println("\n📋 Available endpoints:")
-	fmt.Println("  GET  /health                    - Health check (no auth)")
-	fmt.Println("  GET  /api/v1/users              - List users (read permission)")
-	fmt.Println("  POST /api/v1/users/create       - Create user (write permission)")
-	fmt.Println("  GET  /api/v1/financial          - Financial data (read permission)")
-	fmt.Println("  GET  /api/v1/admin              - Admin panel (admin permission)")
-	fmt.Println("\n💡 Usage examples:")
-	fmt.Println("  curl http://localhost:8081/health")
-	fmt.Println("  curl -H 'X-Subject-ID: sub-001' http://localhost:8081/api/v1/users")
-	fmt.Println("  curl -H 'X-Subject-ID: sub-002' http://localhost:8081/api/v1/financial")
-	fmt.Println("  curl -H 'X-Subject-ID: sub-004' http://localhost:8081/api/v1/users  # Should be denied")
-	fmt.Println("\n🔑 Subject IDs in test data:")
-	fmt.Println("  sub-001: John Doe (Engineering) - Can read APIs")
-	fmt.Println("  sub-002: Alice Smith (Finance) - Can read financial data")
-	fmt.Println("  sub-003: Payment Service - Service account")
-	fmt.Println("  sub-004: Bob Wilson (On probation) - Limited access")
-
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("Server failed to start: %v", err)
-	}
-
-	fmt.Println("👋 Server stopped")
 }
