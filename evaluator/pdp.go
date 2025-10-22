@@ -10,6 +10,37 @@ import (
 	"abac_go_example/storage"
 )
 
+// Constants for policy effects
+const (
+	EffectAllow = "allow"
+	EffectDeny  = "deny"
+)
+
+// Constants for decision results
+const (
+	ResultPermit = "permit"
+	ResultDeny   = "deny"
+)
+
+// Constants for decision reasons
+const (
+	ReasonDeniedByStatement   = "Denied by statement: %s"
+	ReasonAllowedByStatements = "Allowed by statements: %s"
+	ReasonImplicitDeny        = "No matching policies found (implicit deny)"
+)
+
+// Constants for context keys
+const (
+	ContextKeyRequestUserID     = "request:UserId"
+	ContextKeyRequestAction     = "request:Action"
+	ContextKeyRequestResourceID = "request:ResourceId"
+	ContextKeyRequestTime       = "request:Time"
+	ContextKeyUserPrefix        = "user:"
+	ContextKeyResourcePrefix    = "resource:"
+	ContextKeyEnvironmentPrefix = "environment:"
+	ContextKeyRequestPrefix     = "request:"
+)
+
 // PolicyDecisionPointInterface defines the interface for policy evaluation
 type PolicyDecisionPointInterface interface {
 	Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
@@ -79,36 +110,36 @@ func (pdp *PolicyDecisionPoint) buildEvaluationContext(request *models.Evaluatio
 	evalContext := make(map[string]interface{})
 
 	// Request context
-	evalContext["request:UserId"] = request.SubjectID
-	evalContext["request:Action"] = request.Action
-	evalContext["request:ResourceId"] = request.ResourceID
-	evalContext["request:Time"] = context.Timestamp.Format(time.RFC3339)
+	evalContext[ContextKeyRequestUserID] = request.SubjectID
+	evalContext[ContextKeyRequestAction] = request.Action
+	evalContext[ContextKeyRequestResourceID] = request.ResourceID
+	evalContext[ContextKeyRequestTime] = context.Timestamp.Format(time.RFC3339)
 
 	// Add custom context from request
 	for key, value := range request.Context {
-		evalContext["request:"+key] = value
+		evalContext[ContextKeyRequestPrefix+key] = value
 	}
 
 	// Subject attributes
 	if context.Subject != nil {
 		for key, value := range context.Subject.Attributes {
-			evalContext["user:"+key] = value
+			evalContext[ContextKeyUserPrefix+key] = value
 		}
-		evalContext["user:SubjectType"] = context.Subject.SubjectType
+		evalContext[ContextKeyUserPrefix+"SubjectType"] = context.Subject.SubjectType
 	}
 
 	// Resource attributes
 	if context.Resource != nil {
 		for key, value := range context.Resource.Attributes {
-			evalContext["resource:"+key] = value
+			evalContext[ContextKeyResourcePrefix+key] = value
 		}
-		evalContext["resource:ResourceType"] = context.Resource.ResourceType
-		evalContext["resource:ResourceId"] = context.Resource.ResourceID
+		evalContext[ContextKeyResourcePrefix+"ResourceType"] = context.Resource.ResourceType
+		evalContext[ContextKeyResourcePrefix+"ResourceId"] = context.Resource.ResourceID
 	}
 
 	// Environment attributes
 	for key, value := range context.Environment {
-		evalContext["environment:"+key] = value
+		evalContext[ContextKeyEnvironmentPrefix+key] = value
 	}
 
 	return evalContext
@@ -133,11 +164,11 @@ func (pdp *PolicyDecisionPoint) evaluateNewPolicies(policies []*models.Policy, c
 				}
 
 				// Step 2: Apply Deny-Override - if any statement denies, return deny immediately
-				if strings.ToLower(statement.Effect) == "deny" {
+				if strings.ToLower(statement.Effect) == EffectDeny {
 					return &models.Decision{
-						Result:          "deny",
+						Result:          ResultDeny,
 						MatchedPolicies: matchedPolicies,
-						Reason:          fmt.Sprintf("Denied by statement: %s", statement.Sid),
+						Reason:          fmt.Sprintf(ReasonDeniedByStatement, statement.Sid),
 					}
 				}
 			}
@@ -147,17 +178,17 @@ func (pdp *PolicyDecisionPoint) evaluateNewPolicies(policies []*models.Policy, c
 	// Step 3: If we have any Allow statements, return allow
 	if len(matchedStatements) > 0 {
 		return &models.Decision{
-			Result:          "permit",
+			Result:          ResultPermit,
 			MatchedPolicies: matchedPolicies,
-			Reason:          fmt.Sprintf("Allowed by statements: %s", strings.Join(matchedStatements, ", ")),
+			Reason:          fmt.Sprintf(ReasonAllowedByStatements, strings.Join(matchedStatements, ", ")),
 		}
 	}
 
 	// Step 4: Default deny (no matching policies)
 	return &models.Decision{
-		Result:          "deny",
+		Result:          ResultDeny,
 		MatchedPolicies: []string{},
-		Reason:          "No matching policies found (implicit deny)",
+		Reason:          ReasonImplicitDeny,
 	}
 }
 
@@ -187,7 +218,7 @@ func (pdp *PolicyDecisionPoint) evaluateStatement(statement models.PolicyStateme
 
 // matchAction checks if the requested action matches statement action(s)
 func (pdp *PolicyDecisionPoint) matchAction(actionSpec models.JSONActionResource, context map[string]interface{}) bool {
-	requestedAction, ok := context["request:Action"].(string)
+	requestedAction, ok := context[ContextKeyRequestAction].(string)
 	if !ok {
 		return false
 	}
@@ -204,7 +235,7 @@ func (pdp *PolicyDecisionPoint) matchAction(actionSpec models.JSONActionResource
 // matchResource checks if the requested resource matches statement resource(s)
 // and does not match NotResource patterns (if specified)
 func (pdp *PolicyDecisionPoint) matchResource(statement models.PolicyStatement, context map[string]interface{}) bool {
-	requestedResource, ok := context["request:ResourceId"].(string)
+	requestedResource, ok := context[ContextKeyRequestResourceID].(string)
 	if !ok {
 		return false
 	}
