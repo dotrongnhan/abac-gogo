@@ -190,27 +190,33 @@ func (pv *PolicyValidator) validateOperatorConditions(operator string, condition
 		fieldName := fieldPrefix + "." + key
 
 		// Validate based on operator type
-		switch operator {
-		case "StringEquals", "StringNotEquals", "StringLike":
+		switch ConditionOperatorType(operator) {
+		case ConditionStringEquals, ConditionStringNotEquals, ConditionStringLike:
 			if _, ok := value.(string); !ok {
 				pv.addError(result, fieldName, "value must be a string for string operators", value)
 			}
-		case "NumericLessThan", "NumericLessThanEquals", "NumericGreaterThan", "NumericGreaterThanEquals":
+		case ConditionNumericLessThan, ConditionNumericLessThanEquals, ConditionNumericGreaterThan, ConditionNumericGreaterThanEquals:
 			if !pv.isNumeric(value) {
 				pv.addError(result, fieldName, "value must be numeric for numeric operators", value)
 			}
-		case "Bool":
+		case ConditionBool:
 			if _, ok := value.(bool); !ok {
 				pv.addError(result, fieldName, "value must be boolean for Bool operator", value)
 			}
-		case "IpAddress":
+		case ConditionIpAddress:
 			if !pv.isValidIPOrCIDR(value) {
 				pv.addError(result, fieldName, "value must be valid IP address or CIDR", value)
 			}
-		case "DateGreaterThan", "DateLessThan":
+		case ConditionDateGreaterThan, ConditionDateLessThan:
 			if !pv.isValidDateString(value) {
 				pv.addError(result, fieldName, "value must be valid date string", value)
 			}
+		case ConditionAnd, ConditionOr:
+			// For logical operators, validate the nested conditions
+			pv.validateLogicalOperatorConditions(operator, value, fieldName, result)
+		case ConditionNot:
+			// For NOT operator, validate the single nested condition
+			pv.validateNotOperatorCondition(value, fieldName, result)
 		}
 	}
 }
@@ -308,15 +314,57 @@ func (pv *PolicyValidator) validateLocationCondition(loc *models.LocationConditi
 	}
 }
 
+// validateLogicalOperatorConditions validates conditions for AND/OR operators
+func (pv *PolicyValidator) validateLogicalOperatorConditions(operator string, value interface{}, fieldName string, result *ValidationResult) {
+	// Handle array of conditions
+	if conditionsArray, ok := value.([]interface{}); ok {
+		for i, condition := range conditionsArray {
+			conditionFieldName := fmt.Sprintf("%s[%d]", fieldName, i)
+			if conditionMap, ok := condition.(map[string]interface{}); ok {
+				pv.validateConditions(conditionMap, conditionFieldName, result)
+			} else {
+				pv.addError(result, conditionFieldName, "condition must be an object", condition)
+			}
+		}
+		return
+	}
+
+	// Handle map of conditions (traditional format)
+	if conditionsMap, ok := value.(map[string]interface{}); ok {
+		pv.validateConditions(conditionsMap, fieldName, result)
+		return
+	}
+
+	pv.addError(result, fieldName, fmt.Sprintf("value for %s operator must be array or object", operator), value)
+}
+
+// validateNotOperatorCondition validates condition for NOT operator
+func (pv *PolicyValidator) validateNotOperatorCondition(value interface{}, fieldName string, result *ValidationResult) {
+	// Handle single condition map
+	if conditionMap, ok := value.(map[string]interface{}); ok {
+		pv.validateConditions(conditionMap, fieldName, result)
+		return
+	}
+
+	// Handle array with single condition
+	if conditionsArray, ok := value.([]interface{}); ok {
+		if len(conditionsArray) == 1 {
+			if conditionMap, ok := conditionsArray[0].(map[string]interface{}); ok {
+				pv.validateConditions(conditionMap, fmt.Sprintf("%s[0]", fieldName), result)
+				return
+			}
+		}
+		pv.addError(result, fieldName, "NOT operator must have exactly one condition", conditionsArray)
+		return
+	}
+
+	pv.addError(result, fieldName, "value for Not operator must be object or array with single condition", value)
+}
+
 // Helper validation methods
 
 func (pv *PolicyValidator) isValidConditionOperator(operator string) bool {
-	validOperators := []string{
-		"StringEquals", "StringNotEquals", "StringLike",
-		"NumericLessThan", "NumericLessThanEquals", "NumericGreaterThan", "NumericGreaterThanEquals",
-		"Bool", "IpAddress", "DateGreaterThan", "DateLessThan",
-	}
-	return pv.contains(validOperators, operator)
+	return ConditionOperatorType(operator).IsValid()
 }
 
 func (pv *PolicyValidator) isNumeric(value interface{}) bool {

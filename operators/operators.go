@@ -8,6 +8,69 @@ import (
 	"strings"
 )
 
+// OperatorType represents the type of operator
+type OperatorType string
+
+// Enum constants for simple operators
+const (
+	// Equality operators
+	OperatorEqual    OperatorType = "eq"
+	OperatorNotEqual OperatorType = "neq"
+
+	// Set membership operators
+	OperatorIn    OperatorType = "in"
+	OperatorNotIn OperatorType = "nin"
+
+	// String operators
+	OperatorContains OperatorType = "contains"
+	OperatorRegex    OperatorType = "regex"
+
+	// Comparison operators
+	OperatorGreaterThan      OperatorType = "gt"
+	OperatorGreaterThanEqual OperatorType = "gte"
+	OperatorLessThan         OperatorType = "lt"
+	OperatorLessThanEqual    OperatorType = "lte"
+
+	// Range operators
+	OperatorBetween OperatorType = "between"
+
+	// Existence operators
+	OperatorExists OperatorType = "exists"
+)
+
+// AllOperatorTypes returns all available operator types
+func AllOperatorTypes() []OperatorType {
+	return []OperatorType{
+		OperatorEqual,
+		OperatorNotEqual,
+		OperatorIn,
+		OperatorNotIn,
+		OperatorContains,
+		OperatorRegex,
+		OperatorGreaterThan,
+		OperatorGreaterThanEqual,
+		OperatorLessThan,
+		OperatorLessThanEqual,
+		OperatorBetween,
+		OperatorExists,
+	}
+}
+
+// String returns the string representation of the operator type
+func (ot OperatorType) String() string {
+	return string(ot)
+}
+
+// IsValid checks if the operator type is valid
+func (ot OperatorType) IsValid() bool {
+	for _, validOp := range AllOperatorTypes() {
+		if ot == validOp {
+			return true
+		}
+	}
+	return false
+}
+
 // Operator interface defines the contract for rule operators
 type Operator interface {
 	Evaluate(actual, expected interface{}) bool
@@ -24,19 +87,19 @@ func NewOperatorRegistry() *OperatorRegistry {
 		operators: make(map[string]Operator),
 	}
 
-	// Register default operators
-	registry.Register("eq", &EqualOperator{})
-	registry.Register("neq", &NotEqualOperator{})
-	registry.Register("in", &InOperator{})
-	registry.Register("nin", &NotInOperator{})
-	registry.Register("contains", &ContainsOperator{})
-	registry.Register("regex", &RegexOperator{})
-	registry.Register("gt", &GreaterThanOperator{})
-	registry.Register("gte", &GreaterThanEqualOperator{})
-	registry.Register("lt", &LessThanOperator{})
-	registry.Register("lte", &LessThanEqualOperator{})
-	registry.Register("between", &BetweenOperator{})
-	registry.Register("exists", &ExistsOperator{})
+	// Register default operators using enum constants
+	registry.Register(OperatorEqual.String(), &EqualOperator{})
+	registry.Register(OperatorNotEqual.String(), &NotEqualOperator{})
+	registry.Register(OperatorIn.String(), &InOperator{})
+	registry.Register(OperatorNotIn.String(), &NotInOperator{})
+	registry.Register(OperatorContains.String(), &ContainsOperator{})
+	registry.Register(OperatorRegex.String(), &RegexOperator{})
+	registry.Register(OperatorGreaterThan.String(), &GreaterThanOperator{})
+	registry.Register(OperatorGreaterThanEqual.String(), &GreaterThanEqualOperator{})
+	registry.Register(OperatorLessThan.String(), &LessThanOperator{})
+	registry.Register(OperatorLessThanEqual.String(), &LessThanEqualOperator{})
+	registry.Register(OperatorBetween.String(), &BetweenOperator{})
+	registry.Register(OperatorExists.String(), &ExistsOperator{})
 
 	return registry
 }

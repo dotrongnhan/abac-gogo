@@ -8,6 +8,106 @@ import (
 	"time"
 )
 
+// ConditionOperatorType represents the type of condition operator
+type ConditionOperatorType string
+
+// Enum constants for condition operators
+const (
+	// String operators
+	ConditionStringEquals    ConditionOperatorType = "StringEquals"
+	ConditionStringNotEquals ConditionOperatorType = "StringNotEquals"
+	ConditionStringLike      ConditionOperatorType = "StringLike"
+
+	// Numeric operators
+	ConditionNumericLessThan          ConditionOperatorType = "NumericLessThan"
+	ConditionNumericLessThanEquals    ConditionOperatorType = "NumericLessThanEquals"
+	ConditionNumericGreaterThan       ConditionOperatorType = "NumericGreaterThan"
+	ConditionNumericGreaterThanEquals ConditionOperatorType = "NumericGreaterThanEquals"
+
+	// Boolean operator
+	ConditionBool ConditionOperatorType = "Bool"
+
+	// Network operator
+	ConditionIpAddress ConditionOperatorType = "IpAddress"
+
+	// Date operators
+	ConditionDateGreaterThan ConditionOperatorType = "DateGreaterThan"
+	ConditionDateLessThan    ConditionOperatorType = "DateLessThan"
+
+	// Logical operators for complex conditions
+	ConditionAnd ConditionOperatorType = "And"
+	ConditionOr  ConditionOperatorType = "Or"
+	ConditionNot ConditionOperatorType = "Not"
+)
+
+// AllConditionOperatorTypes returns all available condition operator types
+func AllConditionOperatorTypes() []ConditionOperatorType {
+	return []ConditionOperatorType{
+		ConditionStringEquals,
+		ConditionStringNotEquals,
+		ConditionStringLike,
+		ConditionNumericLessThan,
+		ConditionNumericLessThanEquals,
+		ConditionNumericGreaterThan,
+		ConditionNumericGreaterThanEquals,
+		ConditionBool,
+		ConditionIpAddress,
+		ConditionDateGreaterThan,
+		ConditionDateLessThan,
+		ConditionAnd,
+		ConditionOr,
+		ConditionNot,
+	}
+}
+
+// String returns the string representation of the condition operator type
+func (cot ConditionOperatorType) String() string {
+	return string(cot)
+}
+
+// IsValid checks if the condition operator type is valid
+func (cot ConditionOperatorType) IsValid() bool {
+	for _, validOp := range AllConditionOperatorTypes() {
+		if cot == validOp {
+			return true
+		}
+	}
+	return false
+}
+
+// GetOperatorCategory returns the category of the operator (string, numeric, boolean, etc.)
+func (cot ConditionOperatorType) GetOperatorCategory() string {
+	switch cot {
+	case ConditionStringEquals, ConditionStringNotEquals, ConditionStringLike:
+		return "string"
+	case ConditionNumericLessThan, ConditionNumericLessThanEquals,
+		ConditionNumericGreaterThan, ConditionNumericGreaterThanEquals:
+		return "numeric"
+	case ConditionBool:
+		return "boolean"
+	case ConditionIpAddress:
+		return "network"
+	case ConditionDateGreaterThan, ConditionDateLessThan:
+		return "date"
+	case ConditionAnd, ConditionOr, ConditionNot:
+		return "logical"
+	default:
+		return "unknown"
+	}
+}
+
+// ComplexCondition represents a complex condition with logical operators
+type ComplexCondition struct {
+	Type       string                `json:"type"`                 // "simple", "logical"
+	Operator   ConditionOperatorType `json:"operator,omitempty"`   // For simple: StringEquals, etc. For logical: And, Or, Not
+	Key        string                `json:"key,omitempty"`        // For simple conditions: attribute path
+	Value      interface{}           `json:"value,omitempty"`      // For simple conditions: expected value
+	Left       *ComplexCondition     `json:"left,omitempty"`       // For logical conditions: left operand
+	Right      *ComplexCondition     `json:"right,omitempty"`      // For logical conditions: right operand
+	Operand    *ComplexCondition     `json:"operand,omitempty"`    // For NOT operator: single operand
+	Conditions []ComplexCondition    `json:"conditions,omitempty"` // For array of conditions (alternative format)
+}
+
 // ConditionEvaluator handles condition evaluation
 type ConditionEvaluator struct{}
 
@@ -31,38 +131,209 @@ func (ce *ConditionEvaluator) Evaluate(conditions map[string]interface{}, contex
 	return true
 }
 
-// evaluateOperator evaluates a specific operator's conditions
-func (ce *ConditionEvaluator) evaluateOperator(operator string, operatorConditions interface{}, context map[string]interface{}) bool {
-	conditionsMap, ok := operatorConditions.(map[string]interface{})
-	if !ok {
-		return false
+// EvaluateComplex evaluates a complex condition with logical operators
+func (ce *ConditionEvaluator) EvaluateComplex(condition *ComplexCondition, context map[string]interface{}) bool {
+	if condition == nil {
+		return true
 	}
 
+	switch condition.Type {
+	case "simple":
+		return ce.evaluateSimpleCondition(condition, context)
+	case "logical":
+		return ce.evaluateLogicalCondition(condition, context)
+	default:
+		// Try to infer type based on operator
+		if condition.Operator == ConditionAnd || condition.Operator == ConditionOr || condition.Operator == ConditionNot {
+			return ce.evaluateLogicalCondition(condition, context)
+		}
+		return ce.evaluateSimpleCondition(condition, context)
+	}
+}
+
+// evaluateOperator evaluates a specific operator's conditions
+func (ce *ConditionEvaluator) evaluateOperator(operator string, operatorConditions interface{}, context map[string]interface{}) bool {
+	switch ConditionOperatorType(operator) {
+	case ConditionAnd:
+		return ce.evaluateAndOperator(operatorConditions, context)
+	case ConditionOr:
+		return ce.evaluateOrOperator(operatorConditions, context)
+	case ConditionNot:
+		return ce.evaluateNotOperator(operatorConditions, context)
+	default:
+		// Handle traditional operators
+		conditionsMap, ok := operatorConditions.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		return ce.evaluateTraditionalOperator(ConditionOperatorType(operator), conditionsMap, context)
+	}
+}
+
+// evaluateTraditionalOperator evaluates traditional (non-logical) operators
+func (ce *ConditionEvaluator) evaluateTraditionalOperator(operator ConditionOperatorType, conditionsMap map[string]interface{}, context map[string]interface{}) bool {
 	switch operator {
-	case "StringEquals":
+	case ConditionStringEquals:
 		return ce.evaluateStringEquals(conditionsMap, context)
-	case "StringNotEquals":
+	case ConditionStringNotEquals:
 		return ce.evaluateStringNotEquals(conditionsMap, context)
-	case "StringLike":
+	case ConditionStringLike:
 		return ce.evaluateStringLike(conditionsMap, context)
-	case "NumericLessThan":
+	case ConditionNumericLessThan:
 		return ce.evaluateNumericLessThan(conditionsMap, context)
-	case "NumericLessThanEquals":
+	case ConditionNumericLessThanEquals:
 		return ce.evaluateNumericLessThanEquals(conditionsMap, context)
-	case "NumericGreaterThan":
+	case ConditionNumericGreaterThan:
 		return ce.evaluateNumericGreaterThan(conditionsMap, context)
-	case "NumericGreaterThanEquals":
+	case ConditionNumericGreaterThanEquals:
 		return ce.evaluateNumericGreaterThanEquals(conditionsMap, context)
-	case "Bool":
+	case ConditionBool:
 		return ce.evaluateBool(conditionsMap, context)
-	case "IpAddress":
+	case ConditionIpAddress:
 		return ce.evaluateIpAddress(conditionsMap, context)
-	case "DateGreaterThan":
+	case ConditionDateGreaterThan:
 		return ce.evaluateDateGreaterThan(conditionsMap, context)
-	case "DateLessThan":
+	case ConditionDateLessThan:
 		return ce.evaluateDateLessThan(conditionsMap, context)
 	default:
 		return false // Unknown operator
+	}
+}
+
+// Logical operators
+
+// evaluateAndOperator evaluates AND logical operator
+func (ce *ConditionEvaluator) evaluateAndOperator(operatorConditions interface{}, context map[string]interface{}) bool {
+	// Handle array of conditions
+	if conditionsArray, ok := operatorConditions.([]interface{}); ok {
+		for _, condition := range conditionsArray {
+			if conditionMap, ok := condition.(map[string]interface{}); ok {
+				if !ce.Evaluate(conditionMap, context) {
+					return false
+				}
+			} else {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Handle map of conditions (traditional format)
+	if conditionsMap, ok := operatorConditions.(map[string]interface{}); ok {
+		return ce.Evaluate(conditionsMap, context)
+	}
+
+	return false
+}
+
+// evaluateOrOperator evaluates OR logical operator
+func (ce *ConditionEvaluator) evaluateOrOperator(operatorConditions interface{}, context map[string]interface{}) bool {
+	// Handle array of conditions
+	if conditionsArray, ok := operatorConditions.([]interface{}); ok {
+		for _, condition := range conditionsArray {
+			if conditionMap, ok := condition.(map[string]interface{}); ok {
+				if ce.Evaluate(conditionMap, context) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	// Handle map of conditions (at least one must pass)
+	if conditionsMap, ok := operatorConditions.(map[string]interface{}); ok {
+		for operator, operatorConditions := range conditionsMap {
+			if ce.evaluateOperator(operator, operatorConditions, context) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return false
+}
+
+// evaluateNotOperator evaluates NOT logical operator
+func (ce *ConditionEvaluator) evaluateNotOperator(operatorConditions interface{}, context map[string]interface{}) bool {
+	// Handle single condition map
+	if conditionMap, ok := operatorConditions.(map[string]interface{}); ok {
+		return !ce.Evaluate(conditionMap, context)
+	}
+
+	// Handle array with single condition
+	if conditionsArray, ok := operatorConditions.([]interface{}); ok {
+		if len(conditionsArray) == 1 {
+			if conditionMap, ok := conditionsArray[0].(map[string]interface{}); ok {
+				return !ce.Evaluate(conditionMap, context)
+			}
+		}
+	}
+
+	return false
+}
+
+// evaluateSimpleCondition evaluates a simple condition from ComplexCondition struct
+func (ce *ConditionEvaluator) evaluateSimpleCondition(condition *ComplexCondition, context map[string]interface{}) bool {
+	if condition.Key == "" || condition.Operator == "" {
+		return false
+	}
+
+	// Create a temporary conditions map for the traditional evaluator
+	conditionsMap := map[string]interface{}{
+		condition.Key: condition.Value,
+	}
+
+	return ce.evaluateTraditionalOperator(condition.Operator, conditionsMap, context)
+}
+
+// evaluateLogicalCondition evaluates a logical condition from ComplexCondition struct
+func (ce *ConditionEvaluator) evaluateLogicalCondition(condition *ComplexCondition, context map[string]interface{}) bool {
+	switch condition.Operator {
+	case ConditionAnd:
+		// Handle array format
+		if len(condition.Conditions) > 0 {
+			for _, subCondition := range condition.Conditions {
+				if !ce.EvaluateComplex(&subCondition, context) {
+					return false
+				}
+			}
+			return true
+		}
+		// Handle left/right format
+		if condition.Left != nil && condition.Right != nil {
+			return ce.EvaluateComplex(condition.Left, context) && ce.EvaluateComplex(condition.Right, context)
+		}
+		return false
+
+	case ConditionOr:
+		// Handle array format
+		if len(condition.Conditions) > 0 {
+			for _, subCondition := range condition.Conditions {
+				if ce.EvaluateComplex(&subCondition, context) {
+					return true
+				}
+			}
+			return false
+		}
+		// Handle left/right format
+		if condition.Left != nil && condition.Right != nil {
+			return ce.EvaluateComplex(condition.Left, context) || ce.EvaluateComplex(condition.Right, context)
+		}
+		return false
+
+	case ConditionNot:
+		// Handle single operand
+		if condition.Operand != nil {
+			return !ce.EvaluateComplex(condition.Operand, context)
+		}
+		// Handle left operand (alternative format)
+		if condition.Left != nil {
+			return !ce.EvaluateComplex(condition.Left, context)
+		}
+		return false
+
+	default:
+		return false
 	}
 }
 

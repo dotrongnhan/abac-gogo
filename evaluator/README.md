@@ -98,6 +98,7 @@ type ConditionEvaluator struct{}
 - **Boolean**: `Bool`
 - **Network**: `IpAddress` (CIDR support)
 - **Date/Time**: `DateGreaterThan`, `DateLessThan`
+- **Logical**: `And`, `Or`, `Not` (for complex nested conditions)
 
 ## 🔄 Evaluation Flow Chi Tiết
 
@@ -295,6 +296,160 @@ decision := pdp.evaluateNewPolicies(allPolicies, evalContext)
     "request:source_ip": ["192.168.1.0/24", "10.0.0.0/8"]
   }
 }
+```
+
+### Complex Logical Conditions
+
+The system now supports complex logical operations with `And`, `Or`, and `Not` operators for nested conditions.
+
+#### Simple AND Operation
+```json
+{
+  "And": [
+    {
+      "StringEquals": {
+        "user:department": "engineering"
+      }
+    },
+    {
+      "NumericGreaterThan": {
+        "user:level": 5
+      }
+    }
+  ]
+}
+```
+
+#### Simple OR Operation
+```json
+{
+  "Or": [
+    {
+      "StringEquals": {
+        "user:role": "admin"
+      }
+    },
+    {
+      "StringEquals": {
+        "user:department": "security"
+      }
+    }
+  ]
+}
+```
+
+#### NOT Operation
+```json
+{
+  "Not": {
+    "Bool": {
+      "user:on_probation": true
+    }
+  }
+}
+```
+
+#### Nested Complex Conditions
+```json
+{
+  "And": [
+    {
+      "Or": [
+        {
+          "StringEquals": {
+            "user:department": "engineering"
+          }
+        },
+        {
+          "StringEquals": {
+            "user:role": "admin"
+          }
+        }
+      ]
+    },
+    {
+      "NumericGreaterThanEquals": {
+        "user:level": 5
+      }
+    },
+    {
+      "Not": {
+        "Bool": {
+          "user:on_probation": true
+        }
+      }
+    }
+  ]
+}
+```
+
+#### Multiple Levels of Nesting
+```json
+{
+  "Or": [
+    {
+      "And": [
+        {
+          "StringEquals": {
+            "user:role": "admin"
+          }
+        },
+        {
+          "IpAddress": {
+            "request:sourceIp": ["10.0.0.0/8"]
+          }
+        }
+      ]
+    },
+    {
+      "And": [
+        {
+          "StringEquals": {
+            "user:department": "engineering"
+          }
+        },
+        {
+          "NumericGreaterThan": {
+            "user:level": 7
+          }
+        },
+        {
+          "Not": {
+            "Bool": {
+              "user:on_probation": true
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### Using ComplexCondition Struct (Programmatic)
+```go
+condition := &ComplexCondition{
+    Type:     "logical",
+    Operator: ConditionAnd,
+    Left: &ComplexCondition{
+        Type:     "simple",
+        Operator: ConditionStringEquals,
+        Key:      "user.department",
+        Value:    "engineering",
+    },
+    Right: &ComplexCondition{
+        Type:     "logical",
+        Operator: ConditionNot,
+        Operand: &ComplexCondition{
+            Type:     "simple",
+            Operator: ConditionBool,
+            Key:      "user.on_probation",
+            Value:    true,
+        },
+    },
+}
+
+result := evaluator.EvaluateComplex(condition, context)
 ```
 
 ### Date/Time Conditions
