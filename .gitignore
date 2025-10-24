@@ -9,7 +9,7 @@ coverage.html
 coverage.out
 
 # Logs
-*.log
+
 audit_logs.json
 
 # IDE
