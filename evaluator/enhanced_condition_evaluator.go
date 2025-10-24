@@ -841,7 +841,17 @@ func (ece *EnhancedConditionEvaluator) evaluateNot(conditions interface{}, conte
 func (ece *EnhancedConditionEvaluator) getValueFromContext(attributePath string, context map[string]interface{}) interface{} {
 	// Support dot notation for nested access
 	if strings.Contains(attributePath, ".") {
-		return ece.getNestedValue(attributePath, context)
+		result := ece.getNestedValue(attributePath, context)
+		if result != nil {
+			return result
+		}
+
+		// Fallback: try converting dot notation to colon notation for flat access
+		// e.g., user.department -> user:department
+		flatPath := strings.Replace(attributePath, ".", ":", 1)
+		if value, exists := context[flatPath]; exists {
+			return value
+		}
 	}
 
 	// Direct access
@@ -855,6 +865,54 @@ func (ece *EnhancedConditionEvaluator) getValueFromContext(attributePath string,
 func (ece *EnhancedConditionEvaluator) getNestedValue(path string, context map[string]interface{}) interface{} {
 	parts := strings.Split(path, ".")
 	current := context
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - return the value
+			if value, exists := current[part]; exists {
+				return value
+			}
+			return nil
+		}
+
+		// Navigate deeper
+		if nextLevel, exists := current[part]; exists {
+			if nextMap, ok := nextLevel.(map[string]interface{}); ok {
+				current = nextMap
+			} else {
+				return nil
+			}
+		} else {
+			// Special handling for structured context shortcuts
+			// If we're looking for user.something or resource.something,
+			// try user.attributes.something or resource.attributes.something
+			if i == 0 && (part == "user" || part == "resource") {
+				if structuredContext, exists := context[part]; exists {
+					if structMap, ok := structuredContext.(map[string]interface{}); ok {
+						if attributes, exists := structMap["attributes"]; exists {
+							if attrMap, ok := attributes.(map[string]interface{}); ok {
+								// Try to find the remaining path in attributes
+								remainingPath := strings.Join(parts[1:], ".")
+								result := ece.getNestedValueFromMap(remainingPath, attrMap)
+								if result != nil {
+									return result
+								}
+							}
+						}
+					}
+				}
+			}
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// Helper method to get nested value from a specific map
+func (ece *EnhancedConditionEvaluator) getNestedValueFromMap(path string, contextMap map[string]interface{}) interface{} {
+	parts := strings.Split(path, ".")
+	current := contextMap
 
 	for i, part := range parts {
 		if i == len(parts)-1 {

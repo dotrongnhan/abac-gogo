@@ -58,7 +58,7 @@ func TestImprovedPDP_TimeBasedAttributes(t *testing.T) {
 	}
 
 	// Build enhanced evaluation context
-	context := pdp.buildEnhancedEvaluationContext(request, evalContext)
+	context := pdp.BuildEnhancedEvaluationContext(request, evalContext)
 
 	// Verify time-based attributes are added
 	tests := []struct {
@@ -117,7 +117,7 @@ func TestImprovedPDP_EnvironmentalContext(t *testing.T) {
 		Timestamp:   time.Now(),
 	}
 
-	context := pdp.buildEnhancedEvaluationContext(request, evalContext)
+	context := pdp.BuildEnhancedEvaluationContext(request, evalContext)
 
 	// Verify environmental attributes are processed
 	tests := []struct {
@@ -181,7 +181,7 @@ func TestImprovedPDP_StructuredAttributes(t *testing.T) {
 		Timestamp:   time.Now(),
 	}
 
-	context := pdp.buildEnhancedEvaluationContext(request, evalContext)
+	context := pdp.BuildEnhancedEvaluationContext(request, evalContext)
 
 	// Verify both flat and structured access
 	// Flat access (backward compatibility)

@@ -116,7 +116,7 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 	}
 
 	// Step 3: Build enhanced evaluation context with time-based and environmental attributes
-	evalContext := pdp.buildEnhancedEvaluationContext(request, context)
+	evalContext := pdp.BuildEnhancedEvaluationContext(request, context)
 
 	// Step 4: Evaluate all policies with Deny-Override algorithm
 	decision := pdp.evaluateNewPolicies(allPolicies, evalContext)
@@ -128,8 +128,8 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 	return decision, nil
 }
 
-// buildEnhancedEvaluationContext builds enhanced context map with structured attributes
-func (pdp *PolicyDecisionPoint) buildEnhancedEvaluationContext(request *models.EvaluationRequest, context *models.EvaluationContext) map[string]interface{} {
+// BuildEnhancedEvaluationContext builds enhanced context map with structured attributes
+func (pdp *PolicyDecisionPoint) BuildEnhancedEvaluationContext(request *models.EvaluationRequest, context *models.EvaluationContext) map[string]interface{} {
 	evalContext := make(map[string]interface{}, 50)
 
 	// Request context
@@ -240,7 +240,7 @@ func (pdp *PolicyDecisionPoint) addStructuredSubjectAttributes(evalContext map[s
 	// Structured attributes for enhanced access
 	userContext := map[string]interface{}{
 		"subject_type": context.Subject.SubjectType,
-		"attributes":   context.Subject.Attributes,
+		"attributes":   map[string]interface{}(context.Subject.Attributes),
 	}
 	evalContext["user"] = userContext
 }
@@ -262,7 +262,7 @@ func (pdp *PolicyDecisionPoint) addStructuredResourceAttributes(evalContext map[
 	resourceContext := map[string]interface{}{
 		"resource_type": context.Resource.ResourceType,
 		"resource_id":   context.Resource.ResourceID,
-		"attributes":    context.Resource.Attributes,
+		"attributes":    map[string]interface{}(context.Resource.Attributes),
 	}
 	evalContext["resource"] = resourceContext
 }
