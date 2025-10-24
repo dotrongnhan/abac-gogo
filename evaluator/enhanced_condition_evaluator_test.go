@@ -658,3 +658,104 @@ func TestEnhancedConditionEvaluator_PerformanceWithCache(t *testing.T) {
 		t.Error("Regex pattern should be cached")
 	}
 }
+
+func TestEnhancedConditionEvaluator_ArrayAccess(t *testing.T) {
+	evaluator := NewEnhancedConditionEvaluator()
+
+	context := map[string]interface{}{
+		"user": map[string]interface{}{
+			"roles":       []interface{}{"admin", "developer", "viewer"},
+			"permissions": []interface{}{"read", "write", "execute"},
+			"tags": []interface{}{
+				map[string]interface{}{"name": "urgent", "priority": 1},
+				map[string]interface{}{"name": "important", "priority": 2},
+			},
+		},
+		"resource": map[string]interface{}{
+			"access_list": []interface{}{
+				map[string]interface{}{"user": "alice", "level": 5},
+				map[string]interface{}{"user": "bob", "level": 3},
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		conditions map[string]interface{}
+		expected   bool
+	}{
+		{
+			name: "StringEquals - array element with brackets",
+			conditions: map[string]interface{}{
+				"StringEquals": map[string]interface{}{
+					"user.roles[0]": "admin",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "StringEquals - array element with dot notation",
+			conditions: map[string]interface{}{
+				"StringEquals": map[string]interface{}{
+					"user.roles.1": "developer",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "StringEquals - nested array access",
+			conditions: map[string]interface{}{
+				"StringEquals": map[string]interface{}{
+					"user.tags[0].name": "urgent",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "NumericEquals - nested array access",
+			conditions: map[string]interface{}{
+				"NumericEquals": map[string]interface{}{
+					"user.tags[1].priority": 2,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "ArrayContains - regular array (non-indexed path)",
+			conditions: map[string]interface{}{
+				"ArrayContains": map[string]interface{}{
+					"user.roles": "developer",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "StringEquals - array element mismatch",
+			conditions: map[string]interface{}{
+				"StringEquals": map[string]interface{}{
+					"user.roles[0]": "viewer",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Multiple conditions with array access",
+			conditions: map[string]interface{}{
+				"StringEquals": map[string]interface{}{
+					"user.roles[0]":       "admin",
+					"user.permissions[2]": "execute",
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := evaluator.EvaluateConditions(test.conditions, context)
+			if result != test.expected {
+				t.Errorf("Expected %v, got %v", test.expected, result)
+			}
+		})
+	}
+}
