@@ -10,8 +10,6 @@ import (
 	"abac_go_example/storage"
 )
 
-// NOTE: This main function has been moved to main.go as runDatabaseMigrationAndSeeding()
-/*
 func main() {
 	fmt.Println("🚀 ABAC Database Migration and Data Seeder")
 	fmt.Println("==========================================")
@@ -20,7 +18,8 @@ func main() {
 	config := storage.DefaultDatabaseConfig()
 	pgStorage, err := storage.NewPostgreSQLStorage(config)
 	if err != nil {
-		log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
+		fmt.Printf("Failed to initialize PostgreSQL storage: %v\n", err)
+		os.Exit(1)
 	}
 	defer pgStorage.Close()
 
@@ -28,12 +27,12 @@ func main() {
 
 	// Seed data from JSON files
 	if err := seedData(pgStorage, "."); err != nil {
-		log.Fatalf("Failed to seed data: %v", err)
+		fmt.Printf("Failed to seed data: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Println("✅ Data seeding completed successfully")
 }
-*/
 
 func seedData(storage *storage.PostgreSQLStorage, dataDir string) error {
 	// Seed subjects
