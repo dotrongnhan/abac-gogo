@@ -13,7 +13,11 @@
 9. [Các Toán Tử Array](#các-toán-tử-array)
 10. [Các Toán Tử Logic (And/Or/Not)](#các-toán-tử-logic-andornot)
 11. [Kết Hợp Nhiều Conditions](#kết-hợp-nhiều-conditions)
-12. [Best Practices](#best-practices)
+12. [Ví Dụ Policy Hoàn Chỉnh](#ví-dụ-policy-hoàn-chỉnh)
+13. [Variable Substitution](#variable-substitution)
+14. [Xử Lý Giá Trị và Type Conversion](#xử-lý-giá-trị-và-type-conversion)
+15. [Troubleshooting](#troubleshooting)
+16. [Best Practices](#best-practices)
 
 ---
 
@@ -26,6 +30,46 @@ Field `Condition` trong policy JSON cho phép bạn thiết lập các điều k
 - **Tất cả conditions** trong cùng một block phải **đồng thời thỏa mãn (AND logic)** để policy được áp dụng
 - Nếu có bất kỳ condition nào không thỏa mãn, policy statement đó sẽ không được áp dụng
 - Nếu không có condition nào được chỉ định, statement sẽ luôn được áp dụng (nếu Action và Resource match)
+- Operator names **không phân biệt** hoa thường (case-insensitive)
+- Attribute values **có phân biệt** hoa thường (case-sensitive)
+
+### Quick Reference - Tất Cả Operators
+
+| Category | Operator | Mô Tả | Ví Dụ Value |
+|----------|----------|-------|-------------|
+| **String** | StringEquals | So sánh bằng | `"admin"` hoặc `["admin", "user"]` |
+| | StringNotEquals | So sánh không bằng | `"guest"` |
+| | StringLike | Pattern với * | `"*@company.com"` |
+| | StringContains | Chứa substring | `"@company"` |
+| | StringStartsWith | Bắt đầu bằng | `"admin-"` |
+| | StringEndsWith | Kết thúc bằng | `"-prod"` |
+| | StringRegex | Regular expression | `"^[A-Z][0-9]{3}$"` |
+| **Numeric** | NumericEquals | Bằng | `100` |
+| | NumericNotEquals | Không bằng | `0` |
+| | NumericLessThan | Nhỏ hơn (<) | `1000` |
+| | NumericLessThanEquals | Nhỏ hơn hoặc bằng (<=) | `1000` |
+| | NumericGreaterThan | Lớn hơn (>) | `100` |
+| | NumericGreaterThanEquals | Lớn hơn hoặc bằng (>=) | `100` |
+| | NumericBetween | Trong khoảng | `[100, 1000]` hoặc `{"min": 100, "max": 1000}` |
+| **Boolean** | Bool / Boolean | So sánh boolean | `true` hoặc `false` |
+| **Date/Time** | DateLessThan / TimeLessThan | Trước thời điểm | `"18:00:00"` |
+| | DateGreaterThan / TimeGreaterThan | Sau thời điểm | `"09:00:00"` |
+| | DateLessThanEquals / TimeLessThanEquals | Trước hoặc bằng | `"17:59:59"` |
+| | DateGreaterThanEquals / TimeGreaterThanEquals | Sau hoặc bằng | `"09:00:00"` |
+| | DateBetween / TimeBetween | Trong khoảng thời gian | `["09:00:00", "18:00:00"]` |
+| | DayOfWeek | Ngày trong tuần | `"Monday"` hoặc `["Monday", "Tuesday"]` |
+| | TimeOfDay | Giờ chính xác | `"14:30"` |
+| | IsBusinessHours | Giờ làm việc (9-17, Mon-Fri) | `true` |
+| **Network/IP** | IpAddress | IP trong CIDR range | `"10.0.0.0/8"` hoặc `["10.0.0.0/8", "192.168.1.0/24"]` |
+| | IPInRange | IP trong range | `["172.16.0.0/12"]` |
+| | IPNotInRange | IP không trong range | `["0.0.0.0/0"]` |
+| | IsInternalIP | IP nội bộ | `true` |
+| **Array** | ArrayContains | Array chứa giá trị | `"admin"` |
+| | ArrayNotContains | Array không chứa | `"guest"` |
+| | ArraySize | Kích thước array | `3` hoặc `{"gte": 3}` |
+| **Logic** | And | Tất cả phải thỏa mãn | `[{condition1}, {condition2}]` |
+| | Or | Ít nhất một thỏa mãn | `[{condition1}, {condition2}]` |
+| | Not | Phủ định | `{condition}` |
 
 ### Ví Dụ Cơ Bản
 
@@ -214,30 +258,44 @@ So sánh chuỗi **không bằng**.
 
 ### StringLike
 
-So sánh chuỗi với **wildcard pattern** (%, _).
+So sánh chuỗi với **wildcard pattern** sử dụng `*`.
 
-- `%` = khớp với 0 hoặc nhiều ký tự
-- `_` = khớp với chính xác 1 ký tự
+- `*` = khớp với 0 hoặc nhiều ký tự bất kỳ
+- Pattern matching hỗ trợ:
+  - `*` - khớp tất cả
+  - `prefix*` - bắt đầu bằng prefix
+  - `*suffix` - kết thúc bằng suffix
+  - `*middle*` - chứa middle
 
-**Ví dụ 1: Prefix matching**
+**Ví dụ 1: Suffix matching (kết thúc bằng)**
 ```json
 "Condition": {
   "StringLike": {
-    "user:Email": "%.@company.com"
+    "user:Email": "*@company.com"
   }
 }
 ```
 > Khớp với bất kỳ email nào kết thúc bằng @company.com
 
-**Ví dụ 2: Pattern matching**
+**Ví dụ 2: Prefix matching (bắt đầu bằng)**
 ```json
 "Condition": {
   "StringLike": {
-    "resource:Name": "project_%_report"
+    "resource:Name": "project-*"
   }
 }
 ```
-> Khớp với: project_Q1_report, project_Q2_report, v.v.
+> Khớp với: project-alpha, project-beta, v.v.
+
+**Ví dụ 3: Contains (chứa)**
+```json
+"Condition": {
+  "StringLike": {
+    "user:Email": "*@company.*"
+  }
+}
+```
+> Khớp với bất kỳ email domain nào chứa "company"
 
 ---
 
@@ -1133,6 +1191,623 @@ Kiểm soát admin access với nhiều điều kiện:
 
 ---
 
+## Ví Dụ Policy Hoàn Chỉnh
+
+### Complete Policy với Nhiều Use Cases
+
+Dưới đây là ví dụ một policy file hoàn chỉnh với nhiều use cases thực tế:
+
+```json
+{
+  "policies": [
+    {
+      "id": "pol-document-management-001",
+      "policy_name": "Document Management Access Control",
+      "description": "Comprehensive document access control policy",
+      "version": "1.0.0",
+      "statement": [
+        {
+          "Sid": "AllowOwnDocuments",
+          "Effect": "Allow",
+          "Action": "document:*",
+          "Resource": "api:documents:owner-${request:UserId}/*",
+          "Condition": {}
+        },
+        {
+          "Sid": "AllowDepartmentRead",
+          "Effect": "Allow",
+          "Action": ["document:read", "document:list"],
+          "Resource": "api:documents:dept-${user:Department}/*",
+          "Condition": {
+            "StringNotEquals": {
+              "resource:Sensitivity": "confidential"
+            },
+            "IsBusinessHours": {
+              "environment:is_business_hours": true
+            }
+          }
+        },
+        {
+          "Sid": "AllowManagerConfidentialAccess",
+          "Effect": "Allow",
+          "Action": "document:read",
+          "Resource": "api:documents:*",
+          "Condition": {
+            "StringEquals": {
+              "resource:Sensitivity": "confidential",
+              "user:Role": "manager"
+            },
+            "NumericGreaterThanEquals": {
+              "user:Level": 5
+            }
+          }
+        },
+        {
+          "Sid": "DenyExternalAccessToConfidential",
+          "Effect": "Deny",
+          "Action": "*",
+          "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "resource:Sensitivity": "confidential"
+            },
+            "Not": {
+              "IsInternalIP": {
+                "environment:is_internal_ip": true
+              }
+            }
+          }
+        },
+        {
+          "Sid": "AllowAdminFullAccess",
+          "Effect": "Allow",
+          "Action": "document:*",
+          "Resource": "api:documents:*",
+          "Condition": {
+            "StringEquals": {
+              "user:Role": "admin"
+            },
+            "Bool": {
+              "user:MFAEnabled": true
+            }
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "pol-transaction-approval-001",
+      "policy_name": "Transaction Approval Rules",
+      "description": "Tiered approval based on transaction amount",
+      "version": "1.0.0",
+      "statement": [
+        {
+          "Sid": "SmallTransactionAnyEmployee",
+          "Effect": "Allow",
+          "Action": "transaction:approve",
+          "Resource": "api:transactions:*",
+          "Condition": {
+            "NumericLessThan": {
+              "transaction:Amount": 50000
+            },
+            "IsBusinessHours": {
+              "environment:is_business_hours": true
+            }
+          }
+        },
+        {
+          "Sid": "MediumTransactionRequiresManager",
+          "Effect": "Allow",
+          "Action": "transaction:approve",
+          "Resource": "api:transactions:*",
+          "Condition": {
+            "NumericBetween": {
+              "transaction:Amount": [50000, 500000]
+            },
+            "Or": [
+              {
+                "StringEquals": {
+                  "user:Role": "manager"
+                }
+              },
+              {
+                "StringEquals": {
+                  "user:Role": "director"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Sid": "LargeTransactionRequiresDirector",
+          "Effect": "Allow",
+          "Action": "transaction:approve",
+          "Resource": "api:transactions:*",
+          "Condition": {
+            "NumericGreaterThanEquals": {
+              "transaction:Amount": 500000
+            },
+            "StringEquals": {
+              "user:Role": "director"
+            },
+            "Bool": {
+              "user:MFAEnabled": true
+            }
+          }
+        },
+        {
+          "Sid": "DenyWeekendLargeTransactions",
+          "Effect": "Deny",
+          "Action": "transaction:approve",
+          "Resource": "*",
+          "Condition": {
+            "NumericGreaterThan": {
+              "transaction:Amount": 100000
+            },
+            "DayOfWeek": {
+              "environment:day_of_week": ["Saturday", "Sunday"]
+            }
+          }
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}
+```
+
+**Giải thích flow:**
+
+1. **pol-document-management-001** - Quản lý documents:
+   - User luôn có full access với documents của chính họ
+   - Trong business hours, có thể read documents của department (trừ confidential)
+   - Manager level 5+ có thể read confidential documents
+   - **Deny** external access tới confidential documents (rule này override tất cả Allow rules)
+   - Admin với MFA có full access
+
+2. **pol-transaction-approval-001** - Phê duyệt transactions:
+   - < 50k: Bất kỳ employee nào trong business hours
+   - 50k-500k: Manager hoặc Director
+   - >= 500k: Director với MFA
+   - **Deny** transactions > 100k vào cuối tuần
+
+---
+
+## Variable Substitution
+
+### Cách Hoạt Động
+
+Hệ thống hỗ trợ **variable substitution** sử dụng cú pháp `${prefix:key}` trong cả Resource và Condition values.
+
+**Syntax:**
+```
+${request:UserId}       - ID của user hiện tại
+${user:Department}      - Department của user
+${user:<any-attribute>} - Bất kỳ attribute nào của user
+${resource:<attribute>} - Attribute của resource
+${environment:<key>}    - Environment variable
+```
+
+### Ví Dụ 1: Resource Pattern với Variable
+
+```json
+{
+  "Sid": "AccessOwnDepartmentDocuments",
+  "Effect": "Allow",
+  "Action": "document:read",
+  "Resource": "api:documents:dept-${user:Department}/*",
+  "Condition": {}
+}
+```
+
+**Flow:**
+1. User với `Department: "Engineering"` request access
+2. Resource pattern được expand thành: `api:documents:dept-Engineering/*`
+3. Match với resource: `api:documents:dept-Engineering/doc-123`
+
+### Ví Dụ 2: Condition Value với Variable
+
+```json
+{
+  "Sid": "OwnerCanDelete",
+  "Effect": "Allow",
+  "Action": "document:delete",
+  "Resource": "api:documents:*",
+  "Condition": {
+    "StringEquals": {
+      "resource:Owner": "${request:UserId}"
+    }
+  }
+}
+```
+
+**Flow:**
+1. User `user-123` request delete `document-456`
+2. Condition được expand: `resource:Owner` must equal `user-123`
+3. Nếu `document-456` có `Owner: "user-123"` → Allow
+
+### Ví Dụ 3: Nested Variable Access
+
+```json
+{
+  "Sid": "SameDepartmentManagerAccess",
+  "Effect": "Allow",
+  "Action": "employee:view-salary",
+  "Resource": "api:employees:*",
+  "Condition": {
+    "StringEquals": {
+      "resource:Department": "${user:Department}",
+      "user:Role": "manager"
+    }
+  }
+}
+```
+
+### Ví Dụ 4: Complex Variable Substitution
+
+```json
+{
+  "Resource": "api:projects:${user:Department}/${user:Team}/docs/*",
+  "Condition": {
+    "StringEquals": {
+      "resource:OwnerDepartment": "${user:Department}",
+      "resource:OwnerTeam": "${user:Team}"
+    }
+  }
+}
+```
+
+**Lưu ý quan trọng:**
+- Variables được resolve **tại runtime** khi evaluate policy
+- Nếu attribute không tồn tại, variable sẽ được thay bằng chuỗi rỗng `""`
+- Variable substitution hoạt động với cả **nested attributes** (e.g., `${user:organization.name}`)
+
+---
+
+## Xử Lý Giá Trị và Type Conversion
+
+### Case Sensitivity
+
+**Operator Names:**
+- Operators **KHÔNG phân biệt** hoa thường (case-insensitive)
+- Ví dụ: `StringEquals`, `stringequals`, `STRINGEQUALS` đều hợp lệ
+
+```json
+// Tất cả đều hợp lệ
+"Condition": {
+  "StringEquals": { ... }      // OK
+  "stringequals": { ... }      // OK
+  "STRINGEQUALS": { ... }      // OK
+}
+```
+
+**Attribute Values:**
+- String comparison **phân biệt** hoa thường (case-sensitive)
+
+```json
+"Condition": {
+  "StringEquals": {
+    "user:Role": "Admin"     // Chỉ khớp với "Admin", không khớp "admin"
+  }
+}
+```
+
+### Type Conversion
+
+Hệ thống tự động convert types khi cần:
+
+**String Conversion:**
+```go
+nil        → ""
+123        → "123"
+true       → "true"
+"hello"    → "hello"
+```
+
+**Numeric Conversion:**
+```go
+"123"      → 123
+"123.45"   → 123.45
+true       → 1
+false      → 0
+nil        → 0
+```
+
+**Boolean Conversion:**
+```go
+true       → true
+"true"     → true
+"1"        → true
+1          → true
+false      → false
+"false"    → false
+"0"        → false
+0          → false
+nil        → false
+```
+
+**Time Parsing:**
+
+Hỗ trợ các formats:
+```go
+"2025-01-15T14:30:00Z"           // RFC3339
+"2025-01-15 14:30:00"            // DateTime
+"15:04"                          // Time of day (HH:MM)
+"2025-01-15"                     // Date only
+```
+
+### Missing Attributes
+
+**Khi attribute không tồn tại trong context:**
+
+1. **String operators:**
+   ```json
+   "StringEquals": {
+     "user:NonExistentField": "value"
+   }
+   ```
+   - Context value = `nil` → converted to `""`
+   - Result: `"" != "value"` → **false** (condition fails)
+
+2. **Numeric operators:**
+   ```json
+   "NumericGreaterThan": {
+     "user:NonExistentField": 5
+   }
+   ```
+   - Context value = `nil` → converted to `0`
+   - Result: `0 > 5` → **false** (condition fails)
+
+3. **Boolean operators:**
+   ```json
+   "Bool": {
+     "user:NonExistentField": true
+   }
+   ```
+   - Context value = `nil` → converted to `false`
+   - Result: `false != true` → **false** (condition fails)
+
+**Best Practice:** Luôn đảm bảo attributes được populate trong context trước khi evaluate.
+
+### Array Values trong Conditions
+
+**StringEquals với array sử dụng OR logic:**
+
+```json
+"Condition": {
+  "StringEquals": {
+    "user:Role": ["admin", "manager", "supervisor"]
+  }
+}
+```
+
+Điều này có nghĩa: **Role phải là admin HOẶC manager HOẶC supervisor**
+
+Tương đương với:
+```json
+"Condition": {
+  "Or": [
+    {"StringEquals": {"user:Role": "admin"}},
+    {"StringEquals": {"user:Role": "manager"}},
+    {"StringEquals": {"user:Role": "supervisor"}}
+  ]
+}
+```
+
+### Nested Value Access
+
+**Dot notation cho nested objects:**
+
+```json
+// Context có cấu trúc:
+{
+  "user": {
+    "attributes": {
+      "department": "Engineering",
+      "location": {
+        "country": "VN",
+        "city": "HCM"
+      }
+    }
+  }
+}
+
+// Truy cập nested values:
+"Condition": {
+  "StringEquals": {
+    "user.attributes.department": "Engineering",
+    "user.attributes.location.country": "VN"
+  }
+}
+```
+
+**Fallback mechanism:**
+1. Thử truy cập với dot notation: `user.attributes.department`
+2. Nếu fail, thử convert sang colon: `user:attributes:department`
+3. Nếu fail, thử structured access: `user` → `attributes` → `department`
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Condition Không Hoạt Động Như Mong Đợi
+
+**Problem:** Policy không match mặc dù tưởng là đúng
+
+**Debugging steps:**
+
+```json
+// ❌ SAI - Thiếu context key prefix
+"Condition": {
+  "StringEquals": {
+    "Department": "Engineering"    // Missing prefix
+  }
+}
+
+// ✅ ĐÚNG
+"Condition": {
+  "StringEquals": {
+    "user:Department": "Engineering"  // With prefix
+  }
+}
+```
+
+**Checklist:**
+- ✅ Có dùng đúng prefix không? (`user:`, `resource:`, `environment:`, `request:`)
+- ✅ Attribute có tồn tại trong context không?
+- ✅ Type có đúng không? (string vs number vs boolean)
+- ✅ Case sensitivity có đúng không?
+
+#### 2. Variable Substitution Không Hoạt Động
+
+**Problem:** Variable không được thay thế
+
+```json
+// ❌ SAI - Syntax sai
+"Resource": "api:documents:owner-{request:UserId}"
+
+// ✅ ĐÚNG
+"Resource": "api:documents:owner-${request:UserId}"
+```
+
+**Checklist:**
+- ✅ Dùng đúng syntax `${...}` (không phải `{...}`)
+- ✅ Attribute key có đúng không?
+- ✅ Attribute có tồn tại trong context không?
+
+#### 3. Time-Based Conditions Không Chính Xác
+
+**Problem:** Time conditions không match
+
+```json
+// ❌ SAI - Format không đúng
+"Condition": {
+  "DateGreaterThan": {
+    "request:TimeOfDay": "9:00 AM"
+  }
+}
+
+// ✅ ĐÚNG
+"Condition": {
+  "DateGreaterThan": {
+    "request:TimeOfDay": "09:00:00"
+  }
+}
+```
+
+**Supported formats:**
+- Time of day: `"15:04"` hoặc `"15:04:05"`
+- Date: `"2025-01-15"`
+- DateTime: `"2025-01-15T14:30:00Z"` (RFC3339)
+
+#### 4. Array Conditions Không Hoạt Động
+
+**Problem:** ArrayContains không tìm thấy giá trị
+
+```json
+// Context:
+{
+  "user:Roles": "admin"  // ❌ String, không phải array
+}
+
+// Condition:
+"ArrayContains": {
+  "user:Roles": "admin"
+}
+```
+
+**Solution:** Đảm bảo attribute là array trong context:
+
+```json
+{
+  "user:Roles": ["admin", "user"]  // ✅ Array
+}
+```
+
+#### 5. IP Address Conditions
+
+**Problem:** IP check không hoạt động
+
+```json
+// ❌ SAI - Thiếu CIDR notation
+"Condition": {
+  "IpAddress": {
+    "environment:client_ip": "192.168.1.100"
+  }
+}
+
+// ✅ ĐÚNG - Với CIDR
+"Condition": {
+  "IpAddress": {
+    "environment:client_ip": "192.168.1.100/32"
+  }
+}
+
+// ✅ ĐÚNG - Range
+"Condition": {
+  "IpAddress": {
+    "environment:client_ip": "192.168.1.0/24"
+  }
+}
+```
+
+### Testing Conditions
+
+**Ví dụ test case:**
+
+```json
+{
+  "test_cases": [
+    {
+      "name": "Manager can approve medium transactions",
+      "request": {
+        "subject_id": "user-123",
+        "action": "transaction:approve",
+        "resource_id": "api:transactions:tx-456",
+        "context": {
+          "transaction:Amount": 250000
+        }
+      },
+      "subject_attributes": {
+        "Role": "manager",
+        "Department": "Finance"
+      },
+      "expected_result": "permit"
+    },
+    {
+      "name": "Regular employee cannot approve medium transactions",
+      "request": {
+        "subject_id": "user-789",
+        "action": "transaction:approve",
+        "resource_id": "api:transactions:tx-456",
+        "context": {
+          "transaction:Amount": 250000
+        }
+      },
+      "subject_attributes": {
+        "Role": "employee",
+        "Department": "Finance"
+      },
+      "expected_result": "deny"
+    }
+  ]
+}
+```
+
+### Debug Logging
+
+Để debug conditions, kiểm tra logs:
+
+```
+Debug: Enhanced condition evaluation failed for conditions: map[...]
+Warning: Missing essential context key: request:Action
+Info: UserId not provided in context
+```
+
+---
+
 ## Best Practices
 
 ### 1. Sử Dụng StringEquals Thay Vì StringLike Khi Có Thể
@@ -1306,6 +1981,9 @@ Sử dụng `${...}` để tham chiếu context values trong conditions:
 - Sử dụng Deny statements cho security-critical rules
 - Implement least privilege principle
 - Log và audit policy decisions
+- Kiểm tra MFA cho sensitive operations
+- Restrict external access với IP checks
+- Implement time-based restrictions cho critical actions
 
 ```json
 {
@@ -1324,17 +2002,240 @@ Sử dụng `${...}` để tham chiếu context values trong conditions:
 }
 ```
 
+### 11. Common Mistakes và Cách Tránh
+
+#### ❌ Quên prefix cho context keys
+```json
+// SAI
+"StringEquals": { "Department": "Engineering" }
+
+// ĐÚNG
+"StringEquals": { "user:Department": "Engineering" }
+```
+
+#### ❌ Dùng sai wildcard syntax
+```json
+// SAI - SQL LIKE syntax
+"StringLike": { "user:Email": "%@company.com" }
+
+// ĐÚNG - Dùng *
+"StringLike": { "user:Email": "*@company.com" }
+```
+
+#### ❌ Quên CIDR notation cho IP
+```json
+// SAI
+"IpAddress": { "environment:client_ip": "192.168.1.100" }
+
+// ĐÚNG
+"IpAddress": { "environment:client_ip": "192.168.1.100/32" }
+```
+
+#### ❌ Nhầm lẫn AND vs OR logic
+```json
+// Trong cùng một operator = AND
+"StringEquals": {
+  "user:Department": "Engineering",  // AND
+  "user:Role": "admin"                // AND
+}
+
+// Muốn OR thì phải dùng array hoặc Or operator
+"StringEquals": {
+  "user:Role": ["admin", "manager"]  // OR
+}
+```
+
+---
+
+## Common Use Cases - Cheat Sheet
+
+### Use Case 1: Ownership Check
+```json
+"Condition": {
+  "StringEquals": {
+    "resource:Owner": "${request:UserId}"
+  }
+}
+```
+
+### Use Case 2: Department Access
+```json
+"Condition": {
+  "StringEquals": {
+    "user:Department": "${resource:Department}"
+  }
+}
+```
+
+### Use Case 3: Business Hours Only
+```json
+"Condition": {
+  "TimeBetween": {
+    "environment:time_of_day": ["09:00", "18:00"]
+  },
+  "DayOfWeek": {
+    "environment:day_of_week": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+  }
+}
+```
+
+### Use Case 4: Internal Network Only
+```json
+"Condition": {
+  "IsInternalIP": {
+    "environment:is_internal_ip": true
+  }
+}
+```
+
+### Use Case 5: MFA Required for Sensitive Actions
+```json
+"Condition": {
+  "Bool": {
+    "user:MFAEnabled": true
+  }
+}
+```
+
+### Use Case 6: Role-Based with Level Check
+```json
+"Condition": {
+  "StringEquals": {
+    "user:Role": ["manager", "director"]
+  },
+  "NumericGreaterThanEquals": {
+    "user:Level": 5
+  }
+}
+```
+
+### Use Case 7: Amount-Based Approval
+```json
+"Condition": {
+  "NumericBetween": {
+    "transaction:Amount": [100000, 1000000]
+  },
+  "StringEquals": {
+    "user:Role": "manager"
+  }
+}
+```
+
+### Use Case 8: Geo-Restriction
+```json
+"Condition": {
+  "StringEquals": {
+    "environment:country": ["VN", "SG", "TH"]
+  }
+}
+```
+
+### Use Case 9: Non-Confidential Access
+```json
+"Condition": {
+  "StringNotEquals": {
+    "resource:Sensitivity": ["confidential", "top-secret"]
+  }
+}
+```
+
+### Use Case 10: Multi-Factor Checks
+```json
+"Condition": {
+  "And": [
+    {
+      "StringEquals": {
+        "user:Role": "admin"
+      }
+    },
+    {
+      "Bool": {
+        "user:MFAEnabled": true
+      }
+    },
+    {
+      "IsInternalIP": {
+        "environment:is_internal_ip": true
+      }
+    },
+    {
+      "IsBusinessHours": {
+        "environment:is_business_hours": true
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Summary
+
+### Key Takeaways
+
+1. **Operators Coverage:**
+   - ✅ 7 String operators (equals, like, contains, regex, v.v.)
+   - ✅ 7 Numeric operators (comparison, between)
+   - ✅ 1 Boolean operator
+   - ✅ 8 Date/Time operators (comparison, business hours, day of week)
+   - ✅ 4 Network/IP operators (range checks, internal IP)
+   - ✅ 3 Array operators (contains, size)
+   - ✅ 3 Logic operators (and, or, not)
+
+2. **Context Keys:**
+   - `request:*` - Request information
+   - `user:*` - User/Subject attributes
+   - `resource:*` - Resource attributes
+   - `environment:*` - Environmental context
+
+3. **Advanced Features:**
+   - ✅ Variable substitution với `${...}`
+   - ✅ Nested value access với dot notation
+   - ✅ Automatic type conversion
+   - ✅ Array values với OR logic
+   - ✅ Case-insensitive operators
+
+4. **Best Practices:**
+   - ✅ Luôn dùng prefix cho context keys
+   - ✅ Test thoroughly với multiple scenarios
+   - ✅ Dùng Deny cho security-critical rules
+   - ✅ Document policies với Sid và description
+   - ✅ Avoid overly complex conditions
+
 ---
 
 ## Tham Khảo Thêm
 
-- [ACTION_FIELD_GUIDE.md](./ACTION_FIELD_GUIDE.md) - Hướng dẫn về Action field
-- [RESOURCE_FIELD_GUIDE.md](./RESOURCE_FIELD_GUIDE.md) - Hướng dẫn về Resource field
-- Xem code implementation tại:
-  - `evaluator/conditions.go` - Condition evaluator cơ bản
-  - `evaluator/enhanced_condition_evaluator.go` - Enhanced condition evaluator
-  - `evaluator/pdp.go` - Policy Decision Point
+### Related Documentation
+- [ACTION_FIELD_GUIDE.md](./ACTION_FIELD_GUIDE.md) - Hướng dẫn chi tiết về Action field
+- [RESOURCE_FIELD_GUIDE.md](./RESOURCE_FIELD_GUIDE.md) - Hướng dẫn chi tiết về Resource field
+
+### Code Implementation
+Xem chi tiết implementation tại:
+- `evaluator/conditions.go` - Condition evaluator cơ bản với traditional operators
+- `evaluator/enhanced_condition_evaluator.go` - Enhanced evaluator với advanced operators
+- `evaluator/pdp.go` - Policy Decision Point với full evaluation logic
+
+### Example Policies
+- `policy_examples_corrected.json` - Các ví dụ policy được validate
 
 ---
 
-**Lưu Ý:** Tài liệu này dựa trên code logic hiện tại. Nếu có thắc mắc về implementation cụ thể, vui lòng tham khảo source code hoặc liên hệ team development.
+## Changelog
+
+**Version 1.0.0** (2025-01-24)
+- Initial comprehensive documentation
+- All operators documented with examples
+- Variable substitution guide
+- Type conversion details
+- Troubleshooting section
+- Common use cases cheat sheet
+
+---
+
+**Lưu Ý:**
+- Tài liệu này dựa trên code logic hiện tại của hệ thống ABAC
+- Nếu có thắc mắc về implementation cụ thể, vui lòng tham khảo source code
+- Để report issues hoặc contribute, liên hệ team development
+
+**Happy Policy Writing! 🚀**
