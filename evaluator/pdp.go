@@ -2,6 +2,8 @@ package evaluator
 
 import (
 	"fmt"
+	"net"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,6 +43,16 @@ const (
 	ContextKeyRequestPrefix     = "request:"
 )
 
+// Enhanced context keys for improved features
+const (
+	ContextKeyClientIP  = "environment:client_ip"
+	ContextKeyUserAgent = "environment:user_agent"
+	ContextKeyCountry   = "environment:country"
+	ContextKeyRegion    = "environment:region"
+	ContextKeyTimeOfDay = "environment:time_of_day"
+	ContextKeyDayOfWeek = "environment:day_of_week"
+)
+
 // PolicyDecisionPointInterface defines the interface for policy evaluation
 type PolicyDecisionPointInterface interface {
 	Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
@@ -53,16 +65,21 @@ type PolicyDecisionPoint struct {
 	actionMatcher      *ActionMatcher
 	resourceMatcher    *ResourceMatcher
 	conditionEvaluator *ConditionEvaluator
+	// Enhanced components
+	enhancedConditionEvaluator *EnhancedConditionEvaluator
+	policyFilter               *PolicyFilter
 }
 
 // NewPolicyDecisionPoint creates a new PDP instance and returns the interface
 func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterface {
 	return &PolicyDecisionPoint{
-		storage:            storage,
-		attributeResolver:  attributes.NewAttributeResolver(storage),
-		actionMatcher:      NewActionMatcher(),
-		resourceMatcher:    NewResourceMatcher(),
-		conditionEvaluator: NewConditionEvaluator(),
+		storage:                    storage,
+		attributeResolver:          attributes.NewAttributeResolver(storage),
+		actionMatcher:              NewActionMatcher(),
+		resourceMatcher:            NewResourceMatcher(),
+		conditionEvaluator:         NewConditionEvaluator(),
+		enhancedConditionEvaluator: NewEnhancedConditionEvaluator(),
+		policyFilter:               NewPolicyFilter(),
 	}
 }
 
@@ -85,18 +102,20 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 		return nil, fmt.Errorf("failed to enrich context: %w", err)
 	}
 
-	// Step 2: Get all policies
+	// Step 2: Get applicable policies with pre-filtering
 	allPolicies, err := pdp.storage.GetPolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get policies: %w", err)
 	}
 
-	// Step 3: Build evaluation context using original request (preserves all context)
-	// This approach maintains data integrity from EvaluateNew while adding validation
-	evalContext := pdp.buildEvaluationContext(request, context)
+	// Pre-filter policies for better performance
+	applicablePolicies := pdp.policyFilter.FilterApplicablePolicies(allPolicies, request)
 
-	// Step 4: Evaluate policies with Deny-Override algorithm
-	decision := pdp.evaluateNewPolicies(allPolicies, evalContext)
+	// Step 3: Build enhanced evaluation context with time-based and environmental attributes
+	evalContext := pdp.buildEnhancedEvaluationContext(request, context)
+
+	// Step 4: Evaluate pre-filtered policies with Deny-Override algorithm
+	decision := pdp.evaluateNewPolicies(applicablePolicies, evalContext)
 
 	// Step 5: Calculate evaluation time
 	evaluationTime := int(time.Since(startTime).Milliseconds())
@@ -105,9 +124,10 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 	return decision, nil
 }
 
-// buildEvaluationContext builds context map for new policy format
-func (pdp *PolicyDecisionPoint) buildEvaluationContext(request *models.EvaluationRequest, context *models.EvaluationContext) map[string]interface{} {
-	evalContext := make(map[string]interface{})
+// buildEnhancedEvaluationContext builds enhanced context map with structured attributes
+func (pdp *PolicyDecisionPoint) buildEnhancedEvaluationContext(request *models.EvaluationRequest, context *models.EvaluationContext) map[string]interface{} {
+	// Pre-allocate map with estimated size for better performance
+	evalContext := make(map[string]interface{}, 50)
 
 	// Request context
 	evalContext[ContextKeyRequestUserID] = request.SubjectID
@@ -115,34 +135,133 @@ func (pdp *PolicyDecisionPoint) buildEvaluationContext(request *models.Evaluatio
 	evalContext[ContextKeyRequestResourceID] = request.ResourceID
 	evalContext[ContextKeyRequestTime] = context.Timestamp.Format(time.RFC3339)
 
+	// Enhanced time-based attributes
+	pdp.addTimeBasedAttributes(evalContext, request, context)
+
+	// Enhanced environmental context
+	pdp.addEnvironmentalContext(evalContext, request)
+
+	// Structured subject attributes
+	pdp.addStructuredSubjectAttributes(evalContext, context)
+
+	// Structured resource attributes
+	pdp.addStructuredResourceAttributes(evalContext, context)
+
 	// Add custom context from request
 	for key, value := range request.Context {
 		evalContext[ContextKeyRequestPrefix+key] = value
 	}
 
-	// Subject attributes
-	if context.Subject != nil {
-		for key, value := range context.Subject.Attributes {
-			evalContext[ContextKeyUserPrefix+key] = value
-		}
-		evalContext[ContextKeyUserPrefix+"SubjectType"] = context.Subject.SubjectType
-	}
-
-	// Resource attributes
-	if context.Resource != nil {
-		for key, value := range context.Resource.Attributes {
-			evalContext[ContextKeyResourcePrefix+key] = value
-		}
-		evalContext[ContextKeyResourcePrefix+"ResourceType"] = context.Resource.ResourceType
-		evalContext[ContextKeyResourcePrefix+"ResourceId"] = context.Resource.ResourceID
-	}
-
-	// Environment attributes
+	// Legacy environment attributes for backward compatibility
 	for key, value := range context.Environment {
 		evalContext[ContextKeyEnvironmentPrefix+key] = value
 	}
 
 	return evalContext
+}
+
+// addTimeBasedAttributes adds time-based attributes (improvement #4)
+func (pdp *PolicyDecisionPoint) addTimeBasedAttributes(evalContext map[string]interface{}, request *models.EvaluationRequest, context *models.EvaluationContext) {
+	var timestamp time.Time
+
+	// Use provided timestamp or current time
+	if request.Timestamp != nil {
+		timestamp = *request.Timestamp
+	} else {
+		timestamp = context.Timestamp
+	}
+
+	// Add time of day (HH:MM format)
+	timeOfDay := timestamp.Format("15:04")
+	evalContext[ContextKeyTimeOfDay] = timeOfDay
+
+	// Add day of week
+	dayOfWeek := timestamp.Weekday().String()
+	evalContext[ContextKeyDayOfWeek] = dayOfWeek
+
+	// Add additional time attributes
+	evalContext[ContextKeyEnvironmentPrefix+"hour"] = timestamp.Hour()
+	evalContext[ContextKeyEnvironmentPrefix+"minute"] = timestamp.Minute()
+	evalContext[ContextKeyEnvironmentPrefix+"is_weekend"] = timestamp.Weekday() == time.Saturday || timestamp.Weekday() == time.Sunday
+	evalContext[ContextKeyEnvironmentPrefix+"is_business_hours"] = timestamp.Hour() >= 9 && timestamp.Hour() < 17
+}
+
+// addEnvironmentalContext adds environmental context (improvement #5)
+func (pdp *PolicyDecisionPoint) addEnvironmentalContext(evalContext map[string]interface{}, request *models.EvaluationRequest) {
+	if request.Environment == nil {
+		return
+	}
+
+	env := request.Environment
+
+	// Client IP and related attributes
+	if env.ClientIP != "" {
+		evalContext[ContextKeyClientIP] = env.ClientIP
+		evalContext[ContextKeyEnvironmentPrefix+"is_internal_ip"] = pdp.isInternalIP(env.ClientIP)
+		evalContext[ContextKeyEnvironmentPrefix+"ip_class"] = pdp.getIPClass(env.ClientIP)
+	}
+
+	// User Agent and device detection
+	if env.UserAgent != "" {
+		evalContext[ContextKeyUserAgent] = env.UserAgent
+		evalContext[ContextKeyEnvironmentPrefix+"is_mobile"] = pdp.isMobileUserAgent(env.UserAgent)
+		evalContext[ContextKeyEnvironmentPrefix+"browser"] = pdp.getBrowserFromUserAgent(env.UserAgent)
+	}
+
+	// Location attributes
+	if env.Country != "" {
+		evalContext[ContextKeyCountry] = env.Country
+	}
+	if env.Region != "" {
+		evalContext[ContextKeyRegion] = env.Region
+	}
+
+	// Custom environment attributes
+	for key, value := range env.Attributes {
+		evalContext[ContextKeyEnvironmentPrefix+key] = value
+	}
+}
+
+// addStructuredSubjectAttributes adds structured subject attributes (improvement #6)
+func (pdp *PolicyDecisionPoint) addStructuredSubjectAttributes(evalContext map[string]interface{}, context *models.EvaluationContext) {
+	if context.Subject == nil {
+		return
+	}
+
+	// Flat attributes for backward compatibility
+	for key, value := range context.Subject.Attributes {
+		evalContext[ContextKeyUserPrefix+key] = value
+	}
+	evalContext[ContextKeyUserPrefix+"SubjectType"] = context.Subject.SubjectType
+
+	// Structured attributes for enhanced access
+	userContext := map[string]interface{}{
+		"subject_type": context.Subject.SubjectType,
+		"attributes":   context.Subject.Attributes,
+	}
+	evalContext["user"] = userContext
+}
+
+// addStructuredResourceAttributes adds structured resource attributes (improvement #6)
+func (pdp *PolicyDecisionPoint) addStructuredResourceAttributes(evalContext map[string]interface{}, context *models.EvaluationContext) {
+	if context.Resource == nil {
+		return
+	}
+
+	// Flat attributes for backward compatibility
+	for key, value := range context.Resource.Attributes {
+		evalContext[ContextKeyResourcePrefix+key] = value
+	}
+	evalContext[ContextKeyResourcePrefix+"ResourceType"] = context.Resource.ResourceType
+	evalContext[ContextKeyResourcePrefix+"ResourceId"] = context.Resource.ResourceID
+
+	// Structured attributes for enhanced access
+	resourceContext := map[string]interface{}{
+		"resource_type": context.Resource.ResourceType,
+		"resource_id":   context.Resource.ResourceID,
+		"attributes":    context.Resource.Attributes,
+	}
+	evalContext["resource"] = resourceContext
 }
 
 // evaluateNewPolicies evaluates policies using the new format with Deny-Override
@@ -204,12 +323,19 @@ func (pdp *PolicyDecisionPoint) evaluateStatement(statement models.PolicyStateme
 		return false
 	}
 
-	// Step 3: Check conditions
+	// Step 3: Check conditions with enhanced evaluation
 	if len(statement.Condition) > 0 {
-		// Substitute variables in conditions
-		expandedConditions := pdp.conditionEvaluator.SubstituteVariables(statement.Condition, context)
-		if !pdp.conditionEvaluator.Evaluate(expandedConditions, context) {
-			return false
+		// Try enhanced condition evaluation first
+		if pdp.enhancedConditionEvaluator != nil {
+			if !pdp.enhancedConditionEvaluator.EvaluateConditions(statement.Condition, context) {
+				return false
+			}
+		} else {
+			// Fallback to legacy condition evaluation
+			expandedConditions := pdp.conditionEvaluator.SubstituteVariables(statement.Condition, context)
+			if !pdp.conditionEvaluator.Evaluate(expandedConditions, context) {
+				return false
+			}
 		}
 	}
 
@@ -265,4 +391,88 @@ func (pdp *PolicyDecisionPoint) matchResource(statement models.PolicyStatement, 
 	}
 
 	return true
+}
+
+// Helper methods for environmental context processing
+
+// isInternalIP checks if an IP address is internal/private
+func (pdp *PolicyDecisionPoint) isInternalIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+
+	// Check for private IP ranges
+	privateRanges := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+	}
+
+	for _, rangeStr := range privateRanges {
+		_, cidr, err := net.ParseCIDR(rangeStr)
+		if err != nil {
+			continue
+		}
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getIPClass returns the class of IP address
+func (pdp *PolicyDecisionPoint) getIPClass(ipStr string) string {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return "invalid"
+	}
+
+	if ip.To4() != nil {
+		return "ipv4"
+	}
+	return "ipv6"
+}
+
+// isMobileUserAgent detects if user agent is from mobile device
+func (pdp *PolicyDecisionPoint) isMobileUserAgent(userAgent string) bool {
+	mobilePatterns := []string{
+		"(?i)mobile",
+		"(?i)android",
+		"(?i)iphone",
+		"(?i)ipad",
+		"(?i)blackberry",
+		"(?i)windows phone",
+	}
+
+	for _, pattern := range mobilePatterns {
+		matched, _ := regexp.MatchString(pattern, userAgent)
+		if matched {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getBrowserFromUserAgent extracts browser name from user agent
+func (pdp *PolicyDecisionPoint) getBrowserFromUserAgent(userAgent string) string {
+	browserPatterns := map[string]string{
+		"(?i)chrome":  "chrome",
+		"(?i)firefox": "firefox",
+		"(?i)safari":  "safari",
+		"(?i)edge":    "edge",
+		"(?i)opera":   "opera",
+	}
+
+	for pattern, browser := range browserPatterns {
+		matched, _ := regexp.MatchString(pattern, userAgent)
+		if matched {
+			return browser
+		}
+	}
+
+	return "unknown"
 }

@@ -318,6 +318,20 @@ type EvaluationRequest struct {
 	ResourceID string                 `json:"resource_id"`
 	Action     string                 `json:"action"`
 	Context    map[string]interface{} `json:"context"`
+	// Enhanced fields for improved PDP
+	Environment *EnvironmentInfo `json:"environment,omitempty"`
+	Timestamp   *time.Time       `json:"timestamp,omitempty"`
+}
+
+// EnvironmentInfo represents environmental context for basic PDP
+type EnvironmentInfo struct {
+	ClientIP   string                 `json:"client_ip,omitempty"`
+	UserAgent  string                 `json:"user_agent,omitempty"`
+	Country    string                 `json:"country,omitempty"`
+	Region     string                 `json:"region,omitempty"`
+	TimeOfDay  string                 `json:"time_of_day,omitempty"` // "14:30"
+	DayOfWeek  string                 `json:"day_of_week,omitempty"` // "Monday"
+	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 
 // EvaluationContext contains all the context needed for evaluation

@@ -310,7 +310,7 @@ func (pdp *EnhancedPDP) evaluateStatementConditions(ctx context.Context, stateme
 	expandedConditions := pdp.legacyConditionEvaluator.SubstituteVariables(statement.Condition, evalContext)
 
 	// Evaluate using enhanced condition evaluator with environmental context
-	return pdp.conditionEvaluator.EvaluateComplexCondition(expandedConditions, req.Environment, evalContext)
+	return pdp.conditionEvaluator.EvaluateConditions(expandedConditions, evalContext)
 }
 
 // matchAction checks if the requested action matches statement action(s)

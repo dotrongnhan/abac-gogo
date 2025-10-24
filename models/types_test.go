@@ -102,13 +102,27 @@ func TestPolicyValidation(t *testing.T) {
 }
 
 func TestEvaluationRequest(t *testing.T) {
+	now := time.Now()
 	request := &EvaluationRequest{
 		RequestID:  "test-001",
 		SubjectID:  "sub-001",
 		ResourceID: "res-001",
 		Action:     "read",
+		Timestamp:  &now, // Enhanced: explicit timestamp
+		Environment: &EnvironmentInfo{ // Enhanced: environmental context
+			ClientIP:  "192.168.1.100",
+			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+			Country:   "Vietnam",
+			Region:    "Ho Chi Minh City",
+			TimeOfDay: now.Format("15:04"),
+			DayOfWeek: now.Weekday().String(),
+			Attributes: map[string]interface{}{
+				"device_type": "desktop",
+				"connection":  "wifi",
+			},
+		},
 		Context: map[string]interface{}{
-			"timestamp": time.Now().Format(time.RFC3339),
+			"timestamp": now.Format(time.RFC3339),
 			"source_ip": "10.0.1.100",
 		},
 	}
@@ -211,5 +225,169 @@ func TestAuditLogStructure(t *testing.T) {
 
 	if unmarshaled.RequestID != auditLog.RequestID {
 		t.Errorf("Expected RequestID %s, got %s", auditLog.RequestID, unmarshaled.RequestID)
+	}
+}
+
+// Test for enhanced EnvironmentInfo struct
+func TestEnvironmentInfo(t *testing.T) {
+	now := time.Now()
+	envInfo := &EnvironmentInfo{
+		ClientIP:  "192.168.1.100",
+		UserAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15",
+		Country:   "Vietnam",
+		Region:    "Ho Chi Minh City",
+		TimeOfDay: now.Format("15:04"),
+		DayOfWeek: now.Weekday().String(),
+		Attributes: map[string]interface{}{
+			"device_type":   "mobile",
+			"connection":    "4g",
+			"screen_size":   "375x812",
+			"vpn_connected": false,
+			"app_version":   "2.1.0",
+		},
+	}
+
+	// Test JSON serialization
+	data, err := json.Marshal(envInfo)
+	if err != nil {
+		t.Fatalf("Failed to marshal EnvironmentInfo: %v", err)
+	}
+
+	var unmarshaled EnvironmentInfo
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal EnvironmentInfo: %v", err)
+	}
+
+	// Validate fields
+	if unmarshaled.ClientIP != envInfo.ClientIP {
+		t.Errorf("Expected ClientIP %s, got %s", envInfo.ClientIP, unmarshaled.ClientIP)
+	}
+
+	if unmarshaled.UserAgent != envInfo.UserAgent {
+		t.Errorf("Expected UserAgent %s, got %s", envInfo.UserAgent, unmarshaled.UserAgent)
+	}
+
+	if unmarshaled.Country != envInfo.Country {
+		t.Errorf("Expected Country %s, got %s", envInfo.Country, unmarshaled.Country)
+	}
+
+	if unmarshaled.TimeOfDay != envInfo.TimeOfDay {
+		t.Errorf("Expected TimeOfDay %s, got %s", envInfo.TimeOfDay, unmarshaled.TimeOfDay)
+	}
+
+	if unmarshaled.DayOfWeek != envInfo.DayOfWeek {
+		t.Errorf("Expected DayOfWeek %s, got %s", envInfo.DayOfWeek, unmarshaled.DayOfWeek)
+	}
+
+	// Test attributes
+	if len(unmarshaled.Attributes) != len(envInfo.Attributes) {
+		t.Errorf("Expected %d attributes, got %d", len(envInfo.Attributes), len(unmarshaled.Attributes))
+	}
+
+	for key, expectedValue := range envInfo.Attributes {
+		if actualValue, exists := unmarshaled.Attributes[key]; !exists {
+			t.Errorf("Missing attribute %s", key)
+		} else if actualValue != expectedValue {
+			t.Errorf("Expected attribute %s = %v, got %v", key, expectedValue, actualValue)
+		}
+	}
+}
+
+// Test enhanced EvaluationRequest with new fields
+func TestEnhancedEvaluationRequest(t *testing.T) {
+	now := time.Now()
+	request := &EvaluationRequest{
+		RequestID:  "enhanced-test-001",
+		SubjectID:  "user-123",
+		ResourceID: "/api/documents/confidential/project-alpha.pdf",
+		Action:     "read",
+		Timestamp:  &now,
+		Environment: &EnvironmentInfo{
+			ClientIP:  "10.0.1.50",
+			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+			Country:   "Vietnam",
+			Region:    "Ho Chi Minh City",
+			TimeOfDay: "14:30",
+			DayOfWeek: "Wednesday",
+			Attributes: map[string]interface{}{
+				"device_type":    "desktop",
+				"browser":        "chrome",
+				"is_mobile":      false,
+				"connection":     "ethernet",
+				"security_level": "high",
+			},
+		},
+		Context: map[string]interface{}{
+			"department":   "Engineering",
+			"clearance":    "confidential",
+			"project":      "alpha",
+			"mfa_verified": true,
+			"session_id":   "sess_abc123",
+		},
+	}
+
+	// Test all required fields
+	if request.RequestID == "" {
+		t.Error("RequestID should not be empty")
+	}
+
+	if request.SubjectID == "" {
+		t.Error("SubjectID should not be empty")
+	}
+
+	if request.ResourceID == "" {
+		t.Error("ResourceID should not be empty")
+	}
+
+	if request.Action == "" {
+		t.Error("Action should not be empty")
+	}
+
+	// Test enhanced fields
+	if request.Timestamp == nil {
+		t.Error("Timestamp should not be nil")
+	}
+
+	if request.Environment == nil {
+		t.Error("Environment should not be nil")
+	}
+
+	// Test environmental context
+	if request.Environment.ClientIP == "" {
+		t.Error("ClientIP should not be empty")
+	}
+
+	if request.Environment.TimeOfDay == "" {
+		t.Error("TimeOfDay should not be empty")
+	}
+
+	if request.Environment.DayOfWeek == "" {
+		t.Error("DayOfWeek should not be empty")
+	}
+
+	// Test JSON serialization with enhanced fields
+	data, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal enhanced EvaluationRequest: %v", err)
+	}
+
+	var unmarshaled EvaluationRequest
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal enhanced EvaluationRequest: %v", err)
+	}
+
+	// Validate unmarshaled data
+	if unmarshaled.RequestID != request.RequestID {
+		t.Errorf("Expected RequestID %s, got %s", request.RequestID, unmarshaled.RequestID)
+	}
+
+	if unmarshaled.Environment == nil {
+		t.Error("Unmarshaled Environment should not be nil")
+	}
+
+	if unmarshaled.Environment != nil && unmarshaled.Environment.ClientIP != request.Environment.ClientIP {
+		t.Errorf("Expected ClientIP %s, got %s", request.Environment.ClientIP, unmarshaled.Environment.ClientIP)
 	}
 }
