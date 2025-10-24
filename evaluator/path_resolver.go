@@ -4,6 +4,14 @@ import (
 	"strings"
 )
 
+// ShortcutConfig defines a path shortcut mapping
+type ShortcutConfig struct {
+	// Prefix is the first part of the path (e.g., "user", "resource", "environment")
+	Prefix string
+	// TargetPath is the intermediate path to insert (e.g., ["attributes"], ["metadata"])
+	TargetPath []string
+}
+
 // PathResolver defines the interface for resolving attribute paths in context
 type PathResolver interface {
 	Resolve(path string, context map[string]interface{}) (value interface{}, found bool)
@@ -14,14 +22,28 @@ type CompositePathResolver struct {
 	resolvers []PathResolver
 }
 
+// DefaultShortcuts returns the default shortcut configurations
+func DefaultShortcuts() []ShortcutConfig {
+	return []ShortcutConfig{
+		{Prefix: "user", TargetPath: []string{"attributes"}},
+		{Prefix: "resource", TargetPath: []string{"attributes"}},
+	}
+}
+
 // NewCompositePathResolver creates a new composite resolver with default strategies
 func NewCompositePathResolver() *CompositePathResolver {
+	return NewCompositePathResolverWithShortcuts(DefaultShortcuts())
+}
+
+// NewCompositePathResolverWithShortcuts creates a new composite resolver with custom shortcut configs
+func NewCompositePathResolverWithShortcuts(shortcuts []ShortcutConfig) *CompositePathResolver {
 	return &CompositePathResolver{
 		resolvers: []PathResolver{
 			&DirectPathResolver{},
+			NewArrayAccessResolver(), // High priority for array access
 			&DotNotationResolver{},
 			&ColonFallbackResolver{},
-			&ShortcutResolver{},
+			NewShortcutResolver(shortcuts),
 		},
 	}
 }
@@ -73,9 +95,22 @@ func (cfr *ColonFallbackResolver) Resolve(path string, context map[string]interf
 	return value, exists
 }
 
-// ShortcutResolver handles special shortcuts for common patterns
+// ShortcutResolver handles configurable shortcuts for common patterns
 // For example: "user.department" might map to "user.attributes.department"
-type ShortcutResolver struct{}
+type ShortcutResolver struct {
+	shortcuts map[string][]string // prefix -> target path
+}
+
+// NewShortcutResolver creates a new shortcut resolver with given configurations
+func NewShortcutResolver(configs []ShortcutConfig) *ShortcutResolver {
+	shortcuts := make(map[string][]string)
+	for _, config := range configs {
+		shortcuts[config.Prefix] = config.TargetPath
+	}
+	return &ShortcutResolver{
+		shortcuts: shortcuts,
+	}
+}
 
 func (sr *ShortcutResolver) Resolve(path string, context map[string]interface{}) (interface{}, bool) {
 	// Only process paths with dots
@@ -90,8 +125,9 @@ func (sr *ShortcutResolver) Resolve(path string, context map[string]interface{})
 
 	firstPart := parts[0]
 
-	// Check if this is a shortcut-enabled prefix (user or resource)
-	if firstPart != "user" && firstPart != "resource" {
+	// Check if this prefix has a configured shortcut
+	targetPath, hasShortcut := sr.shortcuts[firstPart]
+	if !hasShortcut {
 		return nil, false
 	}
 
@@ -106,20 +142,138 @@ func (sr *ShortcutResolver) Resolve(path string, context map[string]interface{})
 		return nil, false
 	}
 
-	// Check if it has an "attributes" sub-map
-	attributes, exists := structMap["attributes"]
-	if !exists {
-		return nil, false
+	// Navigate to the target path (e.g., ["attributes"])
+	current := structMap
+	for _, pathPart := range targetPath {
+		nextLevel, exists := current[pathPart]
+		if !exists {
+			return nil, false
+		}
+
+		nextMap, ok := nextLevel.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+
+		current = nextMap
 	}
 
-	attrMap, ok := attributes.(map[string]interface{})
-	if !ok {
-		return nil, false
-	}
-
-	// Navigate the remaining path in the attributes map
+	// Navigate the remaining path in the target map
 	remainingParts := parts[1:]
-	return navigateNestedMap(remainingParts, attrMap)
+	return navigateNestedMap(remainingParts, current)
+}
+
+// ArrayAccessResolver handles array index access in paths
+// Supports: user.roles[0], user.roles.0
+type ArrayAccessResolver struct {
+	normalizer *PathNormalizer
+}
+
+// NewArrayAccessResolver creates a new array access resolver
+func NewArrayAccessResolver() *ArrayAccessResolver {
+	return &ArrayAccessResolver{
+		normalizer: NewPathNormalizer(),
+	}
+}
+
+func (aar *ArrayAccessResolver) Resolve(path string, context map[string]interface{}) (interface{}, bool) {
+	// Only process paths with array notation
+	if !strings.Contains(path, "[") && !aar.hasNumericPart(path) {
+		return nil, false
+	}
+
+	// Parse path to get array indices
+	pathInfo, err := aar.normalizer.NormalizePath(path)
+	if err != nil || !pathInfo.HasArrayAccess {
+		return nil, false
+	}
+
+	// Navigate with array access support
+	return navigateWithArrayAccess(pathInfo.Parts, pathInfo.ArrayIndices, context)
+}
+
+// hasNumericPart checks if path has numeric parts like "roles.0"
+func (aar *ArrayAccessResolver) hasNumericPart(path string) bool {
+	parts := strings.Split(path, ".")
+	for i, part := range parts {
+		// Skip first part (can't be just a number)
+		if i == 0 {
+			continue
+		}
+		// Check if part is purely numeric
+		if len(part) > 0 && part[0] >= '0' && part[0] <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+// navigateWithArrayAccess navigates through nested maps and arrays
+func navigateWithArrayAccess(parts []string, arrayIndices map[int]int, startMap map[string]interface{}) (interface{}, bool) {
+	var current interface{} = startMap
+
+	for i, part := range parts {
+		// Check if we need to access an array at this position
+		if arrayIndex, hasArrayAccess := arrayIndices[i]; hasArrayAccess {
+			// First, navigate to the field (which should be an array)
+			currentMap, ok := current.(map[string]interface{})
+			if !ok {
+				return nil, false
+			}
+
+			arrayField, exists := currentMap[part]
+			if !exists {
+				return nil, false
+			}
+
+			// Now access the array
+			currentArray, ok := arrayField.([]interface{})
+			if !ok {
+				return nil, false
+			}
+
+			// Check bounds
+			if arrayIndex < 0 || arrayIndex >= len(currentArray) {
+				return nil, false
+			}
+
+			// Access array element
+			current = currentArray[arrayIndex]
+
+			// If this is the last part, return the value
+			if i == len(parts)-1 {
+				return current, true
+			}
+
+			// Otherwise, current should be a map for next iteration
+			// (continue will handle the type check in next iteration)
+			continue
+		}
+
+		// Regular map navigation
+		currentMap, ok := current.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+
+		// Last part - return the value
+		if i == len(parts)-1 {
+			if value, exists := currentMap[part]; exists {
+				return value, true
+			}
+			return nil, false
+		}
+
+		// Navigate deeper
+		nextLevel, exists := currentMap[part]
+		if !exists {
+			return nil, false
+		}
+
+		current = nextLevel
+	}
+
+	return nil, false
 }
 
 // navigateNestedMap is a unified function to navigate through nested maps
