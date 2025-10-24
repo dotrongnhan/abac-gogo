@@ -660,7 +660,8 @@ func TestAuditLogging(t *testing.T) {
 ```go
 func TestAuditIntegration(t *testing.T) {
     // Test complete audit flow
-    storage, _ := storage.NewMockStorage(".") // Uses value-based storage for efficiency
+    config := storage.DefaultDatabaseConfig()
+    storage, _ := storage.NewPostgreSQLStorage(config)
     logger, _ := audit.NewAuditLogger("")
     pdp := evaluator.NewPolicyDecisionPoint(storage)
     

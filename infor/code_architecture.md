@@ -77,8 +77,8 @@ ABAC-gogo-example/
     │   └── resolver_test.go  # Attribute tests
     │
     ├── storage/               # PAP Implementation
-    │   ├── mock_storage.go   # JSON-based storage
-    │   ├── mock_storage_test.go
+    │   ├── mock_storage.go   # In-memory mock storage for testing
+    │   ├── test_helper.go    # Test utilities
     │   └── postgresql_storage.go # Database storage
     │
     ├── operators/             # Rule Operators
@@ -281,19 +281,19 @@ func (resolver *AttributeResolver) EnrichContext(request *models.EvaluationReque
 
 ### 5. Policy Administration Point (PAP)
 
-**Location:** `storage/mock_storage.go`
+**Location:** `storage/postgresql_storage.go`
 
 **Key Methods:**
 ```go
-func (s *MockStorage) GetSubject(id string) (*models.Subject, error)
-func (s *MockStorage) GetResource(id string) (*models.Resource, error)  
-func (s *MockStorage) GetAction(name string) (*models.Action, error)
-func (s *MockStorage) GetPolicies() ([]*models.Policy, error)
+func (s *PostgreSQLStorage) GetSubject(id string) (*models.Subject, error)
+func (s *PostgreSQLStorage) GetResource(id string) (*models.Resource, error)  
+func (s *PostgreSQLStorage) GetAction(name string) (*models.Action, error)
+func (s *PostgreSQLStorage) GetPolicies() ([]*models.Policy, error)
 ```
 
-**Data Loading:**
+**Database Connection:**
 ```go
-func NewMockStorage(dataDir string) (*MockStorage, error) {
+func NewPostgreSQLStorage(config *DatabaseConfig) (*PostgreSQLStorage, error) {
     // Load subjects.json → s.subjects map
     // Load resources.json → s.resources map  
     // Load actions.json → s.actions map

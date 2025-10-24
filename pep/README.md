@@ -48,7 +48,8 @@ import (
 
 func main() {
     // Initialize storage
-    storage, err := storage.NewMockStorage(".")
+    config := storage.DefaultDatabaseConfig()
+    storage, err := storage.NewPostgreSQLStorage(config)
     if err != nil {
         panic(err)
     }

@@ -19,9 +19,9 @@ Package `storage` cung cấp **Data Access Layer** cho hệ thống ABAC với *
 ```
 storage/
 ├── postgresql_storage.go       # PostgreSQL implementation với GORM
-├── mock_storage.go            # JSON-based mock implementation (legacy)
+├── mock_storage.go            # In-memory mock implementation for testing
 ├── database.go               # Database connection management
-└── mock_storage_test.go      # Unit tests cho storage
+└── test_helper.go            # Test utilities and helpers
 ```
 
 ## 🏗️ Core Architecture
@@ -100,52 +100,46 @@ func (s *PostgreSQLStorage) GetSubject(id string) (*models.Subject, error) {
 }
 ```
 
-### MockStorage Implementation (Legacy)
+### MockStorage Implementation (Testing)
 
 ```go
 type MockStorage struct {
-    subjects  map[string]models.Subject     // In-memory subject cache (values, not pointers)
-    resources map[string]models.Resource    // In-memory resource cache (values, not pointers)
-    actions   map[string]models.Action      // In-memory action cache (values, not pointers)
-    policies  []*models.Policy              // In-memory policy list (still pointers for policies)
+    subjects  map[string]*models.Subject
+    resources map[string]*models.Resource
+    actions   map[string]*models.Action
+    policies  []*models.Policy
 }
 ```
 
 **Design Characteristics:**
-- **In-Memory Storage**: Fast access với O(1) lookups
-- **JSON-Based**: Load data từ JSON files
-- **Immutable**: Data không thay đổi sau load
+- **In-Memory Storage**: Fast access for testing
+- **Simple Interface**: Implements Storage interface
+- **Test-Focused**: Designed for unit and integration tests
 - **Thread-Safe**: Safe for concurrent reads
-- **Memory Efficient**: Uses values instead of pointers to reduce heap allocations
 
-## 🔄 Data Loading Process
+## 🔄 Database Operations
 
-### 1. Initialization Flow
+### 1. PostgreSQL Storage Initialization
 
 ```go
-func NewMockStorage(dataDir string) (*MockStorage, error) {
-    storage := &MockStorage{
-        subjects:  make(map[string]models.Subject),
-        resources: make(map[string]models.Resource),
-        actions:   make(map[string]models.Action),
+func NewPostgreSQLStorage(config *DatabaseConfig) (*PostgreSQLStorage, error) {
+    dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=%s",
+        config.Host, config.User, config.Password, config.DatabaseName, 
+        config.Port, config.SSLMode, config.TimeZone)
+    
+    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+    if err != nil {
+        return nil, fmt.Errorf("failed to connect to database: %w", err)
     }
     
-    if err := storage.loadData(dataDir); err != nil {
-        return nil, fmt.Errorf("failed to load data: %w", err)
+    // Auto-migrate tables
+    if err := db.AutoMigrate(&models.Subject{}, &models.Resource{}, 
+                            &models.Action{}, &models.Policy{}, &models.AuditLog{}); err != nil {
+        return nil, fmt.Errorf("failed to migrate database: %w", err)
     }
     
-    return storage, nil
+    return &PostgreSQLStorage{db: db}, nil
 }
-```
-
-**Loading Sequence:**
-```mermaid
-graph TD
-    A[NewMockStorage] --> B[loadSubjects]
-    B --> C[loadResources]
-    C --> D[loadActions]
-    D --> E[loadPolicies]
-    E --> F[Ready for Use]
 ```
 
 ### 2. JSON File Loading

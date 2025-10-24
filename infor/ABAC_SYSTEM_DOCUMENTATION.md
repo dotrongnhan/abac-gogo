@@ -33,10 +33,11 @@ abac_go_example/
 │   ├── operators.go      # Comparison operators
 │   └── operators_test.go # Unit tests cho operators
 ├── storage/               # Data access layer
-│   ├── mock_storage.go   # JSON-based mock storage (legacy)
 │   ├── postgresql_storage.go # PostgreSQL implementation với GORM
 │   ├── database.go       # Database connection management
-│   └── mock_storage_test.go
+│   ├── interface.go      # Storage interface definition
+│   ├── mock_storage.go   # Mock storage for testing
+│   └── test_helper.go    # Test utilities
 ├── audit/                 # Audit logging
 │   ├── logger.go         # Audit trail management
 │   └── logger_test.go
@@ -72,7 +73,7 @@ abac_go_example/
 #### C. **Storage Layer** - `storage/`
 - **Chức năng**: Data access abstraction với multiple implementations
 - **PostgreSQL Storage**: Production-ready với GORM ORM (`postgresql_storage.go`)
-- **Mock Storage**: JSON-based mock storage cho development (`mock_storage.go`)
+- **Mock Storage**: In-memory mock storage for testing (`mock_storage.go`)
 - **Database Management**: Connection pooling và configuration (`database.go`)
 
 #### D. **Policy Enforcement Point (PEP)** - `pep/`
@@ -90,9 +91,9 @@ abac_go_example/
 
 ```mermaid
 graph TD
-    A[main.go] --> B[Initialize MockStorage]
-    B --> C[Load JSON Data Files]
-    C --> D[Build In-Memory Maps]
+    A[main.go] --> B[Initialize PostgreSQL Storage]
+    B --> C[Run Database Migration]
+    C --> D[Connect to Database]
     D --> E[Create PolicyDecisionPoint]
     E --> F[Setup HTTP Server + ABAC Middleware]
     F --> G[Register Protected Endpoints]
@@ -102,10 +103,11 @@ graph TD
 
 **Chi tiết từng bước:**
 
-1. **MockStorage Initialization**:
-   ```go
-   storage, err := storage.NewMockStorage(".")
-   ```
+1. **PostgreSQL Storage Initialization**:
+```go
+   config := storage.DefaultDatabaseConfig()
+   storage, err := storage.NewPostgreSQLStorage(config)
+```
    - Load `subjects.json`, `resources.json`, `actions.json`, `policies.json`
    - Build in-memory maps cho fast lookup (O(1) access)
    - Validate data integrity và relationships
