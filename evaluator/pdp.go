@@ -67,7 +67,6 @@ type PolicyDecisionPoint struct {
 	conditionEvaluator *ConditionEvaluator
 	// Enhanced components
 	enhancedConditionEvaluator *EnhancedConditionEvaluator
-	policyFilter               *PolicyFilter
 }
 
 // NewPolicyDecisionPoint creates a new PDP instance and returns the interface
@@ -79,7 +78,6 @@ func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterfac
 		resourceMatcher:            NewResourceMatcher(),
 		conditionEvaluator:         NewConditionEvaluator(),
 		enhancedConditionEvaluator: NewEnhancedConditionEvaluator(),
-		policyFilter:               NewPolicyFilter(),
 	}
 }
 
@@ -108,14 +106,11 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 		return nil, fmt.Errorf("failed to get policies: %w", err)
 	}
 
-	// Pre-filter policies for better performance
-	applicablePolicies := pdp.policyFilter.FilterApplicablePolicies(allPolicies, request)
-
 	// Step 3: Build enhanced evaluation context with time-based and environmental attributes
 	evalContext := pdp.buildEnhancedEvaluationContext(request, context)
 
-	// Step 4: Evaluate pre-filtered policies with Deny-Override algorithm
-	decision := pdp.evaluateNewPolicies(applicablePolicies, evalContext)
+	// Step 4: Evaluate all policies with Deny-Override algorithm
+	decision := pdp.evaluateNewPolicies(allPolicies, evalContext)
 
 	// Step 5: Calculate evaluation time
 	evaluationTime := int(time.Since(startTime).Milliseconds())

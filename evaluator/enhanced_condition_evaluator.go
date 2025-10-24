@@ -572,10 +572,13 @@ func (ece *EnhancedConditionEvaluator) evaluateIsBusinessHours(conditions interf
 			hour := timeValue.Hour()
 			weekday := timeValue.Weekday()
 			isBusinessHours = hour >= 9 && hour < 17 && weekday >= time.Monday && weekday <= time.Friday
+		} else if boolValue, ok := actualValue.(bool); ok {
+			// If the value is already a boolean, use it directly
+			isBusinessHours = boolValue
 		} else {
-			// Try to get from context
-			hourValue := ece.getValueFromContext("environment:hour", context)
-			dayValue := ece.getValueFromContext("environment:day_of_week", context)
+			// Try to calculate from context
+			hourValue := ece.getValueFromContext("environment.hour", context)
+			dayValue := ece.getValueFromContext("environment.day_of_week", context)
 
 			hour := int(ece.toFloat64(hourValue))
 			dayStr := ece.toString(dayValue)
@@ -650,15 +653,22 @@ func (ece *EnhancedConditionEvaluator) evaluateIsInternalIP(conditions interface
 
 	for attributePath, expected := range condMap {
 		actualValue := ece.getValueFromContext(attributePath, context)
-		ipStr := ece.toString(actualValue)
 		expectedBool := ece.toBool(expected)
 
-		ip := net.ParseIP(ipStr)
-		if ip == nil {
-			return false
+		var isInternal bool
+		if boolValue, ok := actualValue.(bool); ok {
+			// If the value is already a boolean, use it directly
+			isInternal = boolValue
+		} else {
+			// Try to parse as IP and check if internal
+			ipStr := ece.toString(actualValue)
+			ip := net.ParseIP(ipStr)
+			if ip == nil {
+				return false
+			}
+			isInternal = ece.isInternalIP(ip)
 		}
 
-		isInternal := ece.isInternalIP(ip)
 		if isInternal != expectedBool {
 			return false
 		}

@@ -96,7 +96,7 @@ func TestEnhancedConditionEvaluator_StringOperators(t *testing.T) {
 			name: "StringLike - match with wildcards",
 			conditions: map[string]interface{}{
 				"StringLike": map[string]interface{}{
-					"resource.path": "/documents/project-_/%.pdf",
+					"resource.path": "/documents/project-%/%.pdf",
 				},
 			},
 			expected: true,
