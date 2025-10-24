@@ -270,6 +270,7 @@ type Policy struct {
 	ID          string         `json:"id" gorm:"primaryKey;size:255"`
 	PolicyName  string         `json:"policy_name" gorm:"size:255;not null;uniqueIndex"`
 	Description string         `json:"description" gorm:"type:text"`
+	Effect      string         `json:"effect,omitempty" gorm:"size:20;default:'permit'"`
 	Version     string         `json:"version" gorm:"size:50;not null"`
 	Statement   JSONStatements `json:"statement" gorm:"type:jsonb"`
 	Enabled     bool           `json:"enabled" gorm:"default:true;index"`

@@ -197,6 +197,7 @@ func SeedTestData(t *testing.T, storage *PostgreSQLStorage) {
 			ID:          "pol-001",
 			PolicyName:  "Engineering Read Access",
 			Description: "Allow engineering team to read technical resources",
+			Effect:      "permit",
 			Version:     "2024-10-21",
 			Enabled:     true,
 			Statement: models.JSONStatements{
@@ -223,6 +224,7 @@ func SeedTestData(t *testing.T, storage *PostgreSQLStorage) {
 			ID:          "pol-004",
 			PolicyName:  "Deny Probation Write",
 			Description: "Deny write access for employees on probation",
+			Effect:      "deny",
 			Version:     "2024-10-21",
 			Enabled:     true,
 			Statement: models.JSONStatements{
