@@ -1,0 +1,29 @@
+# Binaries
+main
+abac_go_example
+abac-service*
+*.exe
+
+# Test coverage
+coverage.html
+coverage.out
+
+# Logs
+*.log
+audit_logs.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go specific
+*.test
+*.prof
+
+# Temporary files
+*.tmp
+*.temp
