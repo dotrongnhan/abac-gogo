@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"regexp"
 	"strings"
@@ -29,6 +30,14 @@ const (
 	ReasonDeniedByStatement   = "Denied by statement: %s"
 	ReasonAllowedByStatements = "Allowed by statements: %s"
 	ReasonImplicitDeny        = "No matching policies found (implicit deny)"
+)
+
+// Constants for validation and error handling
+const (
+	MaxConditionDepth      = 10   // Maximum depth for nested conditions
+	MaxConditionKeys       = 100  // Maximum number of condition keys
+	MaxEvaluationTimeMs    = 5000 // Maximum evaluation time in milliseconds
+	MinRequiredContextKeys = 3    // Minimum required context keys (action, resource, subject)
 )
 
 // Constants for context keys
@@ -121,7 +130,6 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 
 // buildEnhancedEvaluationContext builds enhanced context map with structured attributes
 func (pdp *PolicyDecisionPoint) buildEnhancedEvaluationContext(request *models.EvaluationRequest, context *models.EvaluationContext) map[string]interface{} {
-	// Pre-allocate map with estimated size for better performance
 	evalContext := make(map[string]interface{}, 50)
 
 	// Request context
@@ -306,46 +314,86 @@ func (pdp *PolicyDecisionPoint) evaluateNewPolicies(policies []*models.Policy, c
 	}
 }
 
-// evaluateStatement evaluates a single policy statement
+// evaluateStatement evaluates a single policy statement against the given context.
+// It performs three main checks: action matching, resource matching, and condition evaluation.
+// Returns true if all checks pass, false otherwise.
 func (pdp *PolicyDecisionPoint) evaluateStatement(statement models.PolicyStatement, context map[string]interface{}) bool {
-	// Step 1: Check action matching
-	if !pdp.matchAction(statement.Action, context) {
+	// Validate input parameters
+	if !pdp.isValidEvaluationContext(context) {
+		log.Printf("Error: Invalid evaluation context provided")
 		return false
 	}
 
-	// Step 2: Check resource matching (including NotResource exclusions)
-	if !pdp.matchResource(statement, context) {
+	// Early return pattern for better readability
+	if !pdp.isActionMatched(statement.Action, context) {
 		return false
 	}
 
-	// Step 3: Check conditions with enhanced evaluation
-	if len(statement.Condition) > 0 {
-		// Try enhanced condition evaluation first
-		if pdp.enhancedConditionEvaluator != nil {
-			if !pdp.enhancedConditionEvaluator.EvaluateConditions(statement.Condition, context) {
-				return false
-			}
-		} else {
-			// Fallback to legacy condition evaluation
-			expandedConditions := pdp.conditionEvaluator.SubstituteVariables(statement.Condition, context)
-			if !pdp.conditionEvaluator.Evaluate(expandedConditions, context) {
-				return false
-			}
+	if !pdp.isResourceMatched(statement, context) {
+		return false
+	}
+
+	return pdp.areConditionsSatisfied(statement.Condition, context)
+}
+
+// isValidEvaluationContext validates that the evaluation context contains required keys
+// and is properly structured for policy evaluation.
+func (pdp *PolicyDecisionPoint) isValidEvaluationContext(context map[string]interface{}) bool {
+	if context == nil {
+		return false
+	}
+
+	// Check for essential context keys (Action and ResourceId are mandatory)
+	essentialKeys := []string{
+		ContextKeyRequestAction,
+		ContextKeyRequestResourceID,
+	}
+
+	for _, key := range essentialKeys {
+		if _, exists := context[key]; !exists {
+			log.Printf("Warning: Missing essential context key: %s", key)
+			return false
 		}
+	}
+
+	// UserId is recommended but not strictly required for some evaluation scenarios
+	if _, exists := context[ContextKeyRequestUserID]; !exists {
+		log.Printf("Info: UserId not provided in context - some policies may not evaluate correctly")
+	}
+
+	// Validate context size to prevent DoS attacks
+	if len(context) > MaxConditionKeys {
+		log.Printf("Warning: Context size exceeds maximum allowed keys: %d > %d", len(context), MaxConditionKeys)
+		return false
 	}
 
 	return true
 }
 
-// matchAction checks if the requested action matches statement action(s)
-func (pdp *PolicyDecisionPoint) matchAction(actionSpec models.JSONActionResource, context map[string]interface{}) bool {
+// isActionMatched checks if the requested action matches the statement's action specification.
+func (pdp *PolicyDecisionPoint) isActionMatched(actionSpec models.JSONActionResource, context map[string]interface{}) bool {
 	requestedAction, ok := context[ContextKeyRequestAction].(string)
 	if !ok {
+		log.Printf("Warning: Missing or invalid action in context: %v", context[ContextKeyRequestAction])
+		return false
+	}
+
+	if requestedAction == "" {
+		log.Printf("Warning: Empty action provided in evaluation context")
 		return false
 	}
 
 	actionValues := actionSpec.GetValues()
+	if len(actionValues) == 0 {
+		log.Printf("Warning: No action patterns specified in policy statement")
+		return false
+	}
+
 	for _, actionPattern := range actionValues {
+		if actionPattern == "" {
+			log.Printf("Warning: Empty action pattern found in policy statement")
+			continue
+		}
 		if pdp.actionMatcher.Match(actionPattern, requestedAction) {
 			return true
 		}
@@ -353,39 +401,97 @@ func (pdp *PolicyDecisionPoint) matchAction(actionSpec models.JSONActionResource
 	return false
 }
 
-// matchResource checks if the requested resource matches statement resource(s)
-// and does not match NotResource patterns (if specified)
-func (pdp *PolicyDecisionPoint) matchResource(statement models.PolicyStatement, context map[string]interface{}) bool {
+// isResourceMatched checks if the requested resource matches the statement's resource specification
+// and does not match any NotResource exclusion patterns.
+func (pdp *PolicyDecisionPoint) isResourceMatched(statement models.PolicyStatement, context map[string]interface{}) bool {
 	requestedResource, ok := context[ContextKeyRequestResourceID].(string)
 	if !ok {
+		log.Printf("Warning: Missing or invalid resource ID in context: %v", context[ContextKeyRequestResourceID])
 		return false
 	}
 
-	// Check if resource matches Resource patterns
-	resourceMatches := false
-	resourceValues := statement.Resource.GetValues()
+	if requestedResource == "" {
+		log.Printf("Warning: Empty resource ID provided in evaluation context")
+		return false
+	}
+
+	// Check positive resource matching
+	if !pdp.matchesResourcePatterns(statement.Resource, requestedResource, context) {
+		return false
+	}
+
+	// Check NotResource exclusions
+	return !pdp.matchesNotResourcePatterns(statement.NotResource, requestedResource, context)
+}
+
+// matchesResourcePatterns checks if the resource matches any of the specified patterns.
+func (pdp *PolicyDecisionPoint) matchesResourcePatterns(resourceSpec models.JSONActionResource, requestedResource string, context map[string]interface{}) bool {
+	resourceValues := resourceSpec.GetValues()
 	for _, resourcePattern := range resourceValues {
 		if pdp.resourceMatcher.Match(resourcePattern, requestedResource, context) {
-			resourceMatches = true
-			break
+			return true
 		}
 	}
+	return false
+}
 
-	if !resourceMatches {
+// matchesNotResourcePatterns checks if the resource matches any NotResource exclusion patterns.
+func (pdp *PolicyDecisionPoint) matchesNotResourcePatterns(notResourceSpec models.JSONActionResource, requestedResource string, context map[string]interface{}) bool {
+	// If no NotResource patterns are specified, return false (no exclusions)
+	if !notResourceSpec.IsArray && notResourceSpec.Single == "" {
 		return false
 	}
 
-	// Check NotResource exclusions (if specified)
-	if statement.NotResource.IsArray || statement.NotResource.Single != "" {
-		notResourceValues := statement.NotResource.GetValues()
-		for _, notResourcePattern := range notResourceValues {
-			if pdp.resourceMatcher.Match(notResourcePattern, requestedResource, context) {
-				return false // Excluded by NotResource
-			}
+	notResourceValues := notResourceSpec.GetValues()
+	for _, notResourcePattern := range notResourceValues {
+		if pdp.resourceMatcher.Match(notResourcePattern, requestedResource, context) {
+			return true // Resource is excluded
 		}
 	}
+	return false
+}
 
-	return true
+// areConditionsSatisfied evaluates all conditions in the statement.
+// Returns true if no conditions are specified or all conditions pass.
+func (pdp *PolicyDecisionPoint) areConditionsSatisfied(conditions map[string]interface{}, context map[string]interface{}) bool {
+	// No conditions means always satisfied
+	if len(conditions) == 0 {
+		return true
+	}
+
+	// Validate context is not nil
+	if context == nil {
+		log.Printf("Error: Evaluation context is nil when evaluating conditions")
+		return false
+	}
+
+	// Use enhanced condition evaluator if available, otherwise fall back to legacy
+	if pdp.enhancedConditionEvaluator != nil {
+		result := pdp.enhancedConditionEvaluator.EvaluateConditions(conditions, context)
+		if !result {
+			log.Printf("Debug: Enhanced condition evaluation failed for conditions: %v", conditions)
+		}
+		return result
+	}
+
+	return pdp.evaluateConditionsLegacy(conditions, context)
+}
+
+// evaluateConditionsLegacy handles condition evaluation using the legacy condition evaluator.
+func (pdp *PolicyDecisionPoint) evaluateConditionsLegacy(conditions map[string]interface{}, context map[string]interface{}) bool {
+	if pdp.conditionEvaluator == nil {
+		log.Printf("Error: Legacy condition evaluator is nil")
+		return false
+	}
+
+	expandedConditions := pdp.conditionEvaluator.SubstituteVariables(conditions, context)
+	result := pdp.conditionEvaluator.Evaluate(expandedConditions, context)
+
+	if !result {
+		log.Printf("Debug: Legacy condition evaluation failed for conditions: %v", conditions)
+	}
+
+	return result
 }
 
 // Helper methods for environmental context processing
