@@ -1,18 +1,18 @@
 # Core Package
 
-The core package contains the main Policy Decision Point (PDP) implementation and policy validation components.
+Package core chứa main Policy Decision Point (PDP) implementation và policy validation components.
 
 ## Components
 
 ### PolicyDecisionPoint (PDP)
 
-The main evaluation engine that implements the ABAC policy evaluation logic.
+Engine đánh giá chính thực hiện ABAC policy evaluation logic.
 
-#### Features:
-- **Deny-Override Algorithm**: Implements AWS IAM-style deny-override policy combining
-- **Enhanced Context Building**: Automatically enriches evaluation context with time-based and environmental attributes
-- **Structured Attributes**: Supports both flat and nested attribute access patterns
-- **Performance Optimized**: Includes validation, caching, and configurable limits
+#### Tính năng:
+- **Deny-Override Algorithm**: Thực hiện AWS IAM-style deny-override policy combining
+- **Enhanced Context Building**: Tự động enriches evaluation context với time-based và environmental attributes
+- **Structured Attributes**: Hỗ trợ cả flat và nested attribute access patterns
+- **Performance Optimized**: Bao gồm validation, caching, và configurable limits
 
 #### Usage:
 
@@ -40,38 +40,38 @@ decision, err := pdp.Evaluate(request)
 
 #### Context Enhancement
 
-The PDP automatically enhances the evaluation context with:
+PDP tự động enhances evaluation context với:
 
 **Time-based Attributes:**
-- `environment:time_of_day` - Current time in HH:MM format
+- `environment:time_of_day` - Current time trong HH:MM format
 - `environment:day_of_week` - Current day of the week
 - `environment:hour` - Current hour (0-23)
 - `environment:is_weekend` - Boolean indicating weekend
-- `environment:is_business_hours` - Boolean for 9 AM - 5 PM, Mon-Fri
+- `environment:is_business_hours` - Boolean cho 9 AM - 5 PM, Mon-Fri
 
 **Environmental Attributes:**
 - `environment:client_ip` - Client IP address
-- `environment:is_internal_ip` - Boolean for internal IP ranges
+- `environment:is_internal_ip` - Boolean cho internal IP ranges
 - `environment:ip_class` - IP version (ipv4/ipv6)
 - `environment:user_agent` - User agent string
 - `environment:is_mobile` - Mobile device detection
 - `environment:browser` - Browser type detection
 
 **Structured Attributes:**
-- `user.*` - Flat user attributes for backward compatibility
-- `user` - Nested user object with structured access
+- `user.*` - Flat user attributes cho backward compatibility
+- `user` - Nested user object với structured access
 - `resource.*` - Flat resource attributes
 - `resource` - Nested resource object
 
 ### PolicyValidator
 
-Validates policy documents against the ABAC schema and business rules.
+Validates policy documents against ABAC schema và business rules.
 
-#### Features:
-- **Syntax Validation**: Ensures proper JSON structure and required fields
-- **Semantic Validation**: Validates condition operators and value types
+#### Tính năng:
+- **Syntax Validation**: Đảm bảo proper JSON structure và required fields
+- **Semantic Validation**: Validates condition operators và value types
 - **Business Rules**: Enforces organizational policy constraints
-- **Detailed Error Reporting**: Provides specific validation error messages
+- **Detailed Error Reporting**: Cung cấp specific validation error messages
 
 #### Usage:
 
@@ -121,49 +121,49 @@ if !result.IsValid {
 - Nested conditions properly structured
 - Maximum nesting depth enforced
 
-## Implementation Details
+## Chi tiết Implementation
 
 ### Evaluation Algorithm
 
-The PDP uses a deny-override algorithm:
+PDP sử dụng deny-override algorithm:
 
-1. **Policy Retrieval**: Get all enabled policies from storage
-2. **Context Enhancement**: Enrich request context with computed attributes
-3. **Statement Evaluation**: For each policy statement:
+1. **Policy Retrieval**: Get all enabled policies từ storage
+2. **Context Enhancement**: Enrich request context với computed attributes
+3. **Statement Evaluation**: Cho mỗi policy statement:
    - Check action matching
-   - Check resource matching (including NotResource exclusions)
+   - Check resource matching (bao gồm NotResource exclusions)
    - Evaluate conditions
 4. **Decision Logic**:
-   - If any statement with Effect="Deny" matches → DENY
-   - If any statement with Effect="Allow" matches → PERMIT
-   - If no statements match → DENY (implicit deny)
+   - Nếu bất kỳ statement nào với Effect="Deny" matches → DENY
+   - Nếu bất kỳ statement nào với Effect="Allow" matches → PERMIT
+   - Nếu không có statements match → DENY (implicit deny)
 
 ### Performance Optimizations
 
-- **Early Termination**: Stop evaluation on first deny match
-- **Context Validation**: Validate context structure before evaluation
-- **Resource Limits**: Configurable limits on condition complexity
+- **Early Termination**: Stop evaluation trên first deny match
+- **Context Validation**: Validate context structure trước evaluation
+- **Resource Limits**: Configurable limits trên condition complexity
 - **Efficient Matching**: Optimized pattern matching algorithms
 
 ### Error Handling
 
-The core package provides comprehensive error handling:
+Package core cung cấp comprehensive error handling:
 
-- **Input Validation**: Validates all inputs before processing
-- **Context Errors**: Reports missing or invalid context attributes
+- **Input Validation**: Validates tất cả inputs trước processing
+- **Context Errors**: Reports missing hoặc invalid context attributes
 - **Storage Errors**: Handles storage backend failures gracefully
-- **Evaluation Errors**: Captures and reports evaluation failures
+- **Evaluation Errors**: Captures và reports evaluation failures
 
 ### Testing
 
-The core package includes extensive tests:
+Package core bao gồm extensive tests:
 
-- **Unit Tests**: Test individual methods and components
+- **Unit Tests**: Test individual methods và components
 - **Integration Tests**: End-to-end policy evaluation scenarios
-- **Performance Tests**: Benchmarking and load testing
+- **Performance Tests**: Benchmarking và load testing
 - **Error Cases**: Comprehensive error condition testing
 
-Run core package tests:
+Chạy core package tests:
 
 ```bash
 go test ./evaluator/core
@@ -172,10 +172,10 @@ go test ./evaluator/core -bench=.
 
 ## Configuration
 
-The core package respects configuration constants:
+Package core tuân theo configuration constants:
 
 ```go
-// From constants package
+// Từ constants package
 const (
     MaxConditionDepth   = 10    // Maximum condition nesting
     MaxConditionKeys    = 100   // Maximum condition keys
@@ -183,19 +183,19 @@ const (
 )
 ```
 
-## Security Considerations
+## Cân nhắc Security
 
-- **Deny by Default**: No matching policies results in deny
-- **Input Sanitization**: All inputs validated and sanitized
-- **DoS Protection**: Limits prevent resource exhaustion attacks
-- **Audit Logging**: All evaluation decisions are logged
+- **Deny by Default**: Không có matching policies results in deny
+- **Input Sanitization**: Tất cả inputs validated và sanitized
+- **DoS Protection**: Limits ngăn chặn resource exhaustion attacks
+- **Audit Logging**: Tất cả evaluation decisions được logged
 
-## Future Enhancements
+## Cải tiến Tương lai
 
-Planned improvements for the core package:
+Các cải tiến được lên kế hoạch cho core package:
 
-1. **Policy Caching**: Intelligent caching of frequently used policies
-2. **Parallel Evaluation**: Concurrent evaluation of independent statements
-3. **Policy Optimization**: Automatic policy conflict detection and optimization
-4. **Enhanced Metrics**: Detailed performance and usage metrics
-5. **Distributed Evaluation**: Support for distributed policy stores
+1. **Policy Caching**: Intelligent caching của frequently used policies
+2. **Parallel Evaluation**: Concurrent evaluation của independent statements
+3. **Policy Optimization**: Automatic policy conflict detection và optimization
+4. **Enhanced Metrics**: Detailed performance và usage metrics
+5. **Distributed Evaluation**: Hỗ trợ distributed policy stores

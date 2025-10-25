@@ -1,18 +1,18 @@
 # Conditions Package
 
-The conditions package provides advanced condition evaluation capabilities for ABAC policies, supporting complex logical expressions and a wide range of operators.
+Package conditions cung cấp khả năng đánh giá condition nâng cao cho ABAC policies, hỗ trợ complex logical expressions và nhiều loại operators.
 
 ## Components
 
 ### EnhancedConditionEvaluator
 
-The primary condition evaluation engine that supports complex logical expressions and advanced operators.
+Engine đánh giá condition chính hỗ trợ complex logical expressions và advanced operators.
 
-#### Features:
-- **Comprehensive Operators**: String, numeric, date/time, array, network, and logical operators
-- **Regex Caching**: Compiled regex patterns are cached for performance
-- **Path Resolution**: Advanced attribute path resolution with dot notation and array access
-- **Type Coercion**: Intelligent type conversion for flexible value matching
+#### Tính năng:
+- **Comprehensive Operators**: String, numeric, date/time, array, network, và logical operators
+- **Regex Caching**: Compiled regex patterns được cache để tối ưu performance
+- **Path Resolution**: Advanced attribute path resolution với dot notation và array access
+- **Type Coercion**: Intelligent type conversion để flexible value matching
 
 #### Usage:
 
@@ -40,7 +40,7 @@ context := map[string]interface{}{
 result := evaluator.EvaluateConditions(conditions, context)
 ```
 
-### Supported Operators
+### Các Operators được hỗ trợ
 
 #### String Operators
 
@@ -295,7 +295,7 @@ type ComplexCondition struct {
 
 ## Path Resolution
 
-The conditions package uses advanced path resolution for attribute access:
+Package conditions sử dụng advanced path resolution để attribute access:
 
 ### Dot Notation
 ```json
@@ -327,39 +327,39 @@ The conditions package uses advanced path resolution for attribute access:
 ## Performance Optimizations
 
 ### Regex Caching
-- Compiled regex patterns are cached by pattern string
-- Significant performance improvement for repeated evaluations
-- Cache is maintained per evaluator instance
+- Compiled regex patterns được cache theo pattern string
+- Significant performance improvement cho repeated evaluations
+- Cache được maintain per evaluator instance
 
 ### Efficient Type Conversion
-- Intelligent type coercion reduces evaluation overhead
-- Supports string-to-number, string-to-bool, and time parsing
-- Handles multiple time formats automatically
+- Intelligent type coercion giảm evaluation overhead
+- Hỗ trợ string-to-number, string-to-bool, và time parsing
+- Xử lý multiple time formats automatically
 
 ### Path Resolution Optimization
-- Composite resolver tries most efficient strategies first
-- Direct path lookup before dot notation parsing
-- Minimal string manipulation for common cases
+- Composite resolver thử efficient strategies trước
+- Direct path lookup trước dot notation parsing
+- Minimal string manipulation cho common cases
 
 ## Error Handling
 
-The conditions package provides detailed error information:
+Package conditions cung cấp thông tin error chi tiết:
 
-- **Invalid Operators**: Reports unknown or unsupported operators
-- **Type Mismatches**: Identifies type conversion failures
-- **Path Resolution**: Reports attribute path resolution failures
-- **Regex Errors**: Captures regex compilation errors
+- **Invalid Operators**: Báo cáo unknown hoặc unsupported operators
+- **Type Mismatches**: Xác định type conversion failures
+- **Path Resolution**: Báo cáo attribute path resolution failures
+- **Regex Errors**: Capture regex compilation errors
 
 ## Testing
 
-Comprehensive test coverage includes:
+Comprehensive test coverage bao gồm:
 
 - **Operator Tests**: Individual operator functionality
 - **Complex Logic Tests**: Nested logical expressions
-- **Performance Tests**: Benchmarking and caching effectiveness
+- **Performance Tests**: Benchmarking và caching effectiveness
 - **Edge Cases**: Null values, type mismatches, malformed input
 
-Run conditions package tests:
+Chạy conditions package tests:
 
 ```bash
 go test ./evaluator/conditions
@@ -369,38 +369,38 @@ go test ./evaluator/conditions -bench=.
 ## Best Practices
 
 ### Condition Design
-1. **Use Specific Operators**: Choose the most specific operator for your use case
-2. **Minimize Nesting**: Keep logical expressions as flat as possible
-3. **Cache Regex**: Use StringRegex for complex patterns that will be reused
-4. **Type Consistency**: Ensure value types match operator expectations
+1. **Use Specific Operators**: Chọn operator cụ thể nhất cho use case của bạn
+2. **Minimize Nesting**: Giữ logical expressions càng flat càng tốt
+3. **Cache Regex**: Sử dụng StringRegex cho complex patterns sẽ được reused
+4. **Type Consistency**: Đảm bảo value types match operator expectations
 
 ### Performance
-1. **Order Conditions**: Place most selective conditions first in AND operations
-2. **Use Caching**: Take advantage of regex and path resolution caching
-3. **Avoid Deep Nesting**: Limit condition nesting depth for better performance
-4. **Batch Evaluations**: Reuse evaluator instances when possible
+1. **Order Conditions**: Đặt most selective conditions trước trong AND operations
+2. **Use Caching**: Tận dụng regex và path resolution caching
+3. **Avoid Deep Nesting**: Giới hạn condition nesting depth để better performance
+4. **Batch Evaluations**: Reuse evaluator instances khi có thể
 
 ### Security
-1. **Validate Input**: Always validate condition structure before evaluation
-2. **Limit Complexity**: Use MaxConditionDepth to prevent DoS attacks
-3. **Sanitize Regex**: Validate regex patterns to prevent ReDoS attacks
-4. **Type Safety**: Rely on type coercion rather than unsafe casting
+1. **Validate Input**: Luôn validate condition structure trước evaluation
+2. **Limit Complexity**: Sử dụng MaxConditionDepth để ngăn DoS attacks
+3. **Sanitize Regex**: Validate regex patterns để ngăn ReDoS attacks
+4. **Type Safety**: Dựa vào type coercion thay vì unsafe casting
 
-## Migration from Legacy
+## Migration từ Legacy
 
-The legacy ConditionEvaluator has been removed. Migration steps:
+Legacy ConditionEvaluator đã được removed. Các bước migration:
 
-1. **Replace Constructor**: Use `NewEnhancedConditionEvaluator()` instead of `NewConditionEvaluator()`
-2. **Update Method Calls**: Use `EvaluateConditions()` instead of `Evaluate()`
-3. **Enhanced Operators**: Take advantage of new operators like StringRegex, NumericBetween
-4. **Path Resolution**: Use dot notation for nested attribute access
+1. **Replace Constructor**: Sử dụng `NewEnhancedConditionEvaluator()` thay vì `NewConditionEvaluator()`
+2. **Update Method Calls**: Sử dụng `EvaluateConditions()` thay vì `Evaluate()`
+3. **Enhanced Operators**: Tận dụng new operators như StringRegex, NumericBetween
+4. **Path Resolution**: Sử dụng dot notation cho nested attribute access
 
-## Future Enhancements
+## Cải tiến Tương lai
 
-Planned improvements:
+Các cải tiến được lên kế hoạch:
 
-1. **Custom Operators**: Plugin system for custom condition operators
-2. **Condition Optimization**: Automatic condition reordering and optimization
-3. **Distributed Caching**: Shared regex and path resolution caches
-4. **Schema Validation**: Runtime validation of condition structure
-5. **Performance Metrics**: Detailed performance monitoring and reporting
+1. **Custom Operators**: Plugin system cho custom condition operators
+2. **Condition Optimization**: Automatic condition reordering và optimization
+3. **Distributed Caching**: Shared regex và path resolution caches
+4. **Schema Validation**: Runtime validation của condition structure
+5. **Performance Metrics**: Detailed performance monitoring và reporting

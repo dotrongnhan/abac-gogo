@@ -1,50 +1,50 @@
 # ABAC Evaluator Package
 
-The evaluator package provides a comprehensive Attribute-Based Access Control (ABAC) policy evaluation system. This package has been refactored to use a clean, modular architecture with the enhanced condition evaluator as the primary evaluation engine.
+Package evaluator cung cấp hệ thống đánh giá policy ABAC (Attribute-Based Access Control) toàn diện. Package này đã được tái cấu trúc để sử dụng kiến trúc modular sạch với enhanced condition evaluator làm engine đánh giá chính.
 
-## Architecture Overview
+## Tổng quan Kiến trúc
 
-The evaluator package is organized into several specialized subpackages:
+Package evaluator được tổ chức thành nhiều subpackage chuyên biệt:
 
 ```
 evaluator/
-├── core/                    # Core PDP and policy validation
+├── core/                    # Core PDP và policy validation
 ├── conditions/              # Condition evaluation engines
-├── matchers/               # Action and resource matching
+├── matchers/               # Action và resource matching
 ├── path/                   # Path resolution utilities
-└── evaluator.go            # Package documentation and usage guide
+└── evaluator.go            # Tài liệu package và hướng dẫn sử dụng
 ```
 
-## Package Structure
+## Cấu trúc Package
 
 ### Core Package (`evaluator/core`)
 
-Contains the main Policy Decision Point (PDP) and policy validation components:
+Chứa Policy Decision Point (PDP) chính và các component validation policy:
 
-- **PolicyDecisionPoint**: Main evaluation engine implementing deny-override algorithm
-- **PolicyValidator**: Validates policy syntax and structure
-- **Integration tests**: Comprehensive end-to-end testing
+- **PolicyDecisionPoint**: Engine đánh giá chính thực hiện deny-override algorithm
+- **PolicyValidator**: Validate cú pháp và cấu trúc policy
+- **Integration tests**: Testing toàn diện từ đầu đến cuối
 
-#### Key Features:
+#### Tính năng chính:
 - Deny-override policy combining algorithm
-- Enhanced context building with time-based and environmental attributes
-- Structured subject and resource attribute handling
-- Performance optimizations with configurable limits
+- Enhanced context building với time-based và environmental attributes
+- Xử lý structured subject và resource attribute
+- Performance optimizations với configurable limits
 
 ### Conditions Package (`evaluator/conditions`)
 
-Advanced condition evaluation with support for complex logical expressions:
+Đánh giá condition nâng cao với hỗ trợ complex logical expressions:
 
-- **EnhancedConditionEvaluator**: Primary condition evaluation engine
-- **ExpressionEvaluator**: Boolean expression evaluation
-- **ComplexCondition**: Legacy condition structure for backward compatibility
+- **EnhancedConditionEvaluator**: Engine đánh giá condition chính
+- **ExpressionEvaluator**: Đánh giá boolean expression
+- **ComplexCondition**: Cấu trúc condition cũ để backward compatibility
 
-#### Supported Operators:
+#### Các Operator được hỗ trợ:
 
 **String Operators:**
 - `StringEquals`, `StringNotEquals`, `StringLike`
 - `StringContains`, `StringStartsWith`, `StringEndsWith`
-- `StringRegex` (with caching for performance)
+- `StringRegex` (có caching để tối ưu performance)
 
 **Numeric Operators:**
 - `NumericEquals`, `NumericNotEquals`
@@ -60,7 +60,7 @@ Advanced condition evaluation with support for complex logical expressions:
 
 **Array Operators:**
 - `ArrayContains`, `ArrayNotContains`
-- `ArraySize` (with comparison operators)
+- `ArraySize` (với comparison operators)
 
 **Network Operators:**
 - `IPInRange`, `IPNotInRange`
@@ -71,28 +71,28 @@ Advanced condition evaluation with support for complex logical expressions:
 
 ### Matchers Package (`evaluator/matchers`)
 
-Handles action and resource pattern matching:
+Xử lý action và resource pattern matching:
 
-- **ActionMatcher**: Matches action patterns with wildcard support
-- **ResourceMatcher**: Matches resource patterns with hierarchical support and variable substitution
+- **ActionMatcher**: Match action patterns với wildcard support
+- **ResourceMatcher**: Match resource patterns với hierarchical support và variable substitution
 
-#### Pattern Formats:
+#### Định dạng Pattern:
 - Actions: `<service>:<resource-type>:<operation>`
 - Resources: `<service>:<resource-type>:<resource-id>`
-- Hierarchical: `<parent>/<child>` structure
-- Variables: `${variable}` substitution from context
+- Hierarchical: cấu trúc `<parent>/<child>`
+- Variables: thay thế `${variable}` từ context
 
 ### Path Package (`evaluator/path`)
 
-Provides flexible attribute path resolution:
+Cung cấp flexible attribute path resolution:
 
-- **CompositePathResolver**: Combines multiple resolution strategies
-- **DotNotationResolver**: Handles nested object access (`user.department`)
-- **PathNormalizer**: Normalizes and validates attribute paths
+- **CompositePathResolver**: Kết hợp nhiều resolution strategies
+- **DotNotationResolver**: Xử lý nested object access (`user.department`)
+- **PathNormalizer**: Normalize và validate attribute paths
 
-## Usage Examples
+## Ví dụ Sử dụng
 
-### Basic Policy Evaluation
+### Đánh giá Policy Cơ bản
 
 ```go
 import (
@@ -122,7 +122,7 @@ if err != nil {
 fmt.Printf("Decision: %s, Reason: %s\n", decision.Result, decision.Reason)
 ```
 
-### Advanced Condition Evaluation
+### Đánh giá Condition Nâng cao
 
 ```go
 import "abac_go_example/evaluator/conditions"
@@ -162,7 +162,7 @@ context := map[string]interface{}{
 result := evaluator.EvaluateConditions(conditions, context)
 ```
 
-### Action and Resource Matching
+### Action và Resource Matching
 
 ```go
 import "abac_go_example/evaluator/matchers"
@@ -179,23 +179,23 @@ context := map[string]interface{}{
 matches = resourceMatcher.Match("api:documents:owner-${request:UserId}", "api:documents:owner-user-123", context)
 ```
 
-## Configuration and Constants
+## Configuration và Constants
 
-The system uses constants defined in the `constants` package:
+Hệ thống sử dụng constants được định nghĩa trong package `constants`:
 
 - **Policy Effects**: `EffectAllow`, `EffectDeny`
 - **Decision Results**: `ResultPermit`, `ResultDeny`
-- **Context Keys**: Standardized context key prefixes and names
-- **Condition Operators**: All supported condition operator types
+- **Context Keys**: Standardized context key prefixes và names
+- **Condition Operators**: Tất cả supported condition operator types
 
-## Performance Considerations
+## Cân nhắc Performance
 
-### Optimizations Implemented:
+### Optimizations đã triển khai:
 
-1. **Regex Caching**: Compiled regex patterns are cached in the enhanced evaluator
-2. **Path Resolution**: Composite resolver tries most efficient strategies first
-3. **Context Validation**: Early validation prevents unnecessary processing
-4. **Configurable Limits**: Maximum condition depth, keys, and evaluation time
+1. **Regex Caching**: Compiled regex patterns được cache trong enhanced evaluator
+2. **Path Resolution**: Composite resolver thử efficient strategies trước
+3. **Context Validation**: Early validation ngăn chặn unnecessary processing
+4. **Configurable Limits**: Maximum condition depth, keys, và evaluation time
 
 ### Performance Limits:
 
@@ -209,13 +209,13 @@ const (
 
 ## Testing
 
-Each package includes comprehensive tests:
+Mỗi package bao gồm comprehensive tests:
 
-- **Unit Tests**: Individual component testing
+- **Unit Tests**: Testing từng component riêng lẻ
 - **Integration Tests**: End-to-end policy evaluation
-- **Performance Tests**: Benchmarking and load testing
+- **Performance Tests**: Benchmarking và load testing
 
-Run tests for specific packages:
+Chạy tests cho specific packages:
 
 ```bash
 # Test all evaluator components
@@ -228,53 +228,53 @@ go test ./evaluator/matchers
 go test ./evaluator/path
 ```
 
-## Migration from Legacy Evaluator
+## Migration từ Legacy Evaluator
 
-The legacy `ConditionEvaluator` has been completely removed. All condition evaluation now uses the `EnhancedConditionEvaluator`:
+Legacy `ConditionEvaluator` đã được loại bỏ hoàn toàn. Tất cả condition evaluation hiện sử dụng `EnhancedConditionEvaluator`:
 
 ### Breaking Changes:
-- Removed `NewConditionEvaluator()` - use `conditions.NewEnhancedConditionEvaluator()`
-- Removed `evaluateConditionsLegacy()` method
-- Updated package structure requires import path changes
+- Đã xóa `NewConditionEvaluator()` - sử dụng `conditions.NewEnhancedConditionEvaluator()`
+- Đã xóa `evaluateConditionsLegacy()` method
+- Cấu trúc package đã cập nhật yêu cầu thay đổi import path
 
-### Migration Steps:
-1. Update imports to use specific subpackages
-2. Replace `NewConditionEvaluator()` with `conditions.NewEnhancedConditionEvaluator()`
-3. Update any direct references to internal methods (now properly encapsulated)
+### Các bước Migration:
+1. Cập nhật imports để sử dụng specific subpackages
+2. Thay thế `NewConditionEvaluator()` bằng `conditions.NewEnhancedConditionEvaluator()`
+3. Cập nhật bất kỳ direct references nào đến internal methods (hiện đã properly encapsulated)
 
 ## Error Handling
 
-The evaluator provides detailed error information:
+Evaluator cung cấp thông tin error chi tiết:
 
-- **Validation Errors**: Policy syntax and structure issues
+- **Validation Errors**: Policy syntax và structure issues
 - **Evaluation Errors**: Runtime evaluation problems
-- **Context Errors**: Missing or invalid context attributes
+- **Context Errors**: Missing hoặc invalid context attributes
 
-## Security Considerations
+## Cân nhắc Security
 
-- **Input Validation**: All inputs are validated before processing
-- **DoS Protection**: Configurable limits prevent resource exhaustion
+- **Input Validation**: Tất cả inputs được validate trước khi processing
+- **DoS Protection**: Configurable limits ngăn chặn resource exhaustion
 - **Secure Defaults**: Deny-by-default policy combining algorithm
-- **Audit Trail**: Comprehensive logging of evaluation decisions
+- **Audit Trail**: Comprehensive logging của evaluation decisions
 
-## Future Enhancements
+## Cải tiến Tương lai
 
-Planned improvements include:
+Các cải tiến được lên kế hoạch bao gồm:
 
-1. **Policy Caching**: Intelligent policy caching for improved performance
-2. **Distributed Evaluation**: Support for distributed policy evaluation
-3. **Policy Optimization**: Automatic policy optimization and conflict detection
-4. **Enhanced Metrics**: Detailed performance and usage metrics
-5. **Policy Templates**: Reusable policy templates and inheritance
+1. **Policy Caching**: Intelligent policy caching để cải thiện performance
+2. **Distributed Evaluation**: Hỗ trợ distributed policy evaluation
+3. **Policy Optimization**: Automatic policy optimization và conflict detection
+4. **Enhanced Metrics**: Detailed performance và usage metrics
+5. **Policy Templates**: Reusable policy templates và inheritance
 
 ## Contributing
 
-When contributing to the evaluator package:
+Khi contribute vào evaluator package:
 
-1. Follow the established package structure
-2. Add comprehensive tests for new features
-3. Update documentation for any API changes
-4. Ensure backward compatibility where possible
-5. Follow Go best practices and the project's coding standards
+1. Tuân theo established package structure
+2. Thêm comprehensive tests cho new features
+3. Cập nhật documentation cho bất kỳ API changes nào
+4. Đảm bảo backward compatibility khi có thể
+5. Tuân theo Go best practices và project's coding standards
 
-For detailed implementation examples, see the test files in each subpackage.
+Để xem detailed implementation examples, hãy xem test files trong mỗi subpackage.

@@ -1,12 +1,12 @@
 # Path Package
 
-The path package provides flexible and efficient attribute path resolution for ABAC condition evaluation.
+Package path cung cấp flexible và efficient attribute path resolution cho ABAC condition evaluation.
 
 ## Components
 
 ### PathResolver Interface
 
-The base interface for all path resolution strategies:
+Base interface cho tất cả path resolution strategies:
 
 ```go
 type PathResolver interface {
@@ -16,12 +16,12 @@ type PathResolver interface {
 
 ### CompositePathResolver
 
-The main path resolver that combines multiple resolution strategies for maximum flexibility and performance.
+Main path resolver kết hợp multiple resolution strategies để maximum flexibility và performance.
 
-#### Resolution Strategies (in order of execution):
-1. **DirectPathResolver**: Direct key lookup for simple paths
-2. **DotNotationResolver**: Nested object access using dot notation
-3. **PathNormalizer**: Advanced path normalization and complex expressions
+#### Resolution Strategies (theo thứ tự execution):
+1. **DirectPathResolver**: Direct key lookup cho simple paths
+2. **DotNotationResolver**: Nested object access sử dụng dot notation
+3. **PathNormalizer**: Advanced path normalization và complex expressions
 
 #### Usage:
 
@@ -56,12 +56,12 @@ value, found = resolver.Resolve("user.roles[0]", context)
 
 ### DotNotationResolver
 
-Specialized resolver for nested object access using dot notation.
+Specialized resolver cho nested object access sử dụng dot notation.
 
-#### Features:
-- **Nested Access**: Navigate through nested maps using dots
+#### Tính năng:
+- **Nested Access**: Navigate through nested maps sử dụng dots
 - **Type Safety**: Handles type mismatches gracefully
-- **Performance Optimized**: Efficient string splitting and navigation
+- **Performance Optimized**: Efficient string splitting và navigation
 
 #### Supported Patterns:
 ```go
@@ -96,13 +96,13 @@ value, found = resolver.Resolve("user.profile.nonexistent", context)
 
 ### PathNormalizer
 
-Advanced path processor that handles complex path expressions and normalization.
+Advanced path processor xử lý complex path expressions và normalization.
 
-#### Features:
-- **Array Access**: Support for array indexing with `[index]` syntax
-- **Path Validation**: Validates path syntax and structure
-- **Expression Parsing**: Handles complex path expressions
-- **Normalization**: Converts various path formats to standard form
+#### Tính năng:
+- **Array Access**: Hỗ trợ array indexing với `[index]` syntax
+- **Path Validation**: Validates path syntax và structure
+- **Expression Parsing**: Xử lý complex path expressions
+- **Normalization**: Converts various path formats thành standard form
 
 #### Supported Patterns:
 
@@ -148,56 +148,56 @@ value, found = normalizer.Resolve("users[1].role", context)
 ## Path Resolution Algorithm
 
 ### CompositePathResolver Algorithm
-1. **Direct Lookup**: Try direct key access first (fastest)
-2. **Dot Notation**: If path contains dots, use dot notation resolver
-3. **Complex Expressions**: Use path normalizer for array access and complex expressions
+1. **Direct Lookup**: Thử direct key access trước (fastest)
+2. **Dot Notation**: Nếu path chứa dots, sử dụng dot notation resolver
+3. **Complex Expressions**: Sử dụng path normalizer cho array access và complex expressions
 4. **Return Result**: Return first successful resolution
 
 ### DotNotationResolver Algorithm
-1. **Dot Check**: Only process paths containing dots
-2. **Split Path**: Split path by dots into segments
+1. **Dot Check**: Chỉ process paths chứa dots
+2. **Split Path**: Split path theo dots thành segments
 3. **Navigate**: Navigate through nested maps segment by segment
-4. **Type Validation**: Ensure each intermediate value is a map
-5. **Return Value**: Return final value and success status
+4. **Type Validation**: Đảm bảo mỗi intermediate value là map
+5. **Return Value**: Return final value và success status
 
 ### PathNormalizer Algorithm
 1. **Expression Parsing**: Parse complex path expressions
 2. **Array Detection**: Identify array access patterns `[index]`
-3. **Segment Processing**: Process each path segment individually
-4. **Index Resolution**: Resolve array indices to actual values
-5. **Value Extraction**: Extract final value from resolved path
+3. **Segment Processing**: Process mỗi path segment individually
+4. **Index Resolution**: Resolve array indices thành actual values
+5. **Value Extraction**: Extract final value từ resolved path
 
 ## Performance Optimizations
 
 ### Composite Resolver Optimizations
-- **Strategy Ordering**: Most efficient resolvers tried first
-- **Early Termination**: Stop on first successful resolution
-- **Minimal Overhead**: Direct delegation to specialized resolvers
+- **Strategy Ordering**: Most efficient resolvers thử trước
+- **Early Termination**: Stop trên first successful resolution
+- **Minimal Overhead**: Direct delegation đến specialized resolvers
 
 ### Dot Notation Optimizations
-- **Efficient Splitting**: Optimized string splitting for dot notation
-- **Type Checking**: Fast type assertions for map navigation
-- **Memory Efficient**: Minimal memory allocation during resolution
+- **Efficient Splitting**: Optimized string splitting cho dot notation
+- **Type Checking**: Fast type assertions cho map navigation
+- **Memory Efficient**: Minimal memory allocation trong resolution
 
 ### Path Normalizer Optimizations
-- **Regex Caching**: Compiled regex patterns for array access detection
-- **Index Parsing**: Efficient integer parsing for array indices
-- **Path Caching**: Could cache normalized paths (future enhancement)
+- **Regex Caching**: Compiled regex patterns cho array access detection
+- **Index Parsing**: Efficient integer parsing cho array indices
+- **Path Caching**: Có thể cache normalized paths (future enhancement)
 
 ## Error Handling
 
 ### Resolution Errors
-The path package handles various error conditions gracefully:
+Package path xử lý various error conditions gracefully:
 
 **Type Mismatches:**
-- Non-map values in dot notation paths return `(nil, false)`
-- Non-array values with array access return `(nil, false)`
-- Invalid type assertions are handled safely
+- Non-map values trong dot notation paths return `(nil, false)`
+- Non-array values với array access return `(nil, false)`
+- Invalid type assertions được handled safely
 
 **Index Errors:**
 - Out-of-bounds array access returns `(nil, false)`
 - Invalid array indices (non-numeric) return `(nil, false)`
-- Negative indices are treated as invalid
+- Negative indices được treated as invalid
 
 **Path Errors:**
 - Empty paths return `(nil, false)`
@@ -223,11 +223,11 @@ The path package handles various error conditions gracefully:
 
 ## Testing
 
-Comprehensive test coverage includes:
+Comprehensive test coverage bao gồm:
 
 ### Unit Tests
 - Individual resolver functionality
-- Path parsing and validation
+- Path parsing và validation
 - Error condition handling
 - Type safety verification
 
@@ -241,9 +241,9 @@ Comprehensive test coverage includes:
 - Resolution speed benchmarks
 - Memory usage analysis
 - Scalability testing
-- Cache effectiveness (when implemented)
+- Cache effectiveness (khi implemented)
 
-Run path package tests:
+Chạy path package tests:
 
 ```bash
 go test ./evaluator/path
@@ -338,30 +338,30 @@ value, _ = resolver.Resolve("organization.teams[0].members[1].role", context)
 ## Best Practices
 
 ### Path Design
-1. **Use Consistent Naming**: Follow consistent attribute naming conventions
-2. **Minimize Nesting**: Keep nesting depth reasonable for performance
-3. **Prefer Dot Notation**: Use dot notation for nested object access
+1. **Use Consistent Naming**: Tuân theo consistent attribute naming conventions
+2. **Minimize Nesting**: Giữ nesting depth reasonable cho performance
+3. **Prefer Dot Notation**: Sử dụng dot notation cho nested object access
 4. **Document Structure**: Document expected context structure
 
 ### Performance
-1. **Cache Resolvers**: Reuse resolver instances when possible
-2. **Optimize Context**: Structure context for efficient access patterns
-3. **Avoid Deep Nesting**: Limit nesting depth for better performance
-4. **Use Direct Access**: Use simple keys when possible
+1. **Cache Resolvers**: Reuse resolver instances khi có thể
+2. **Optimize Context**: Structure context cho efficient access patterns
+3. **Avoid Deep Nesting**: Giới hạn nesting depth để better performance
+4. **Use Direct Access**: Sử dụng simple keys khi có thể
 
 ### Error Handling
-1. **Check Return Values**: Always check the `found` boolean return value
+1. **Check Return Values**: Luôn check `found` boolean return value
 2. **Handle Missing Paths**: Gracefully handle missing attributes
-3. **Validate Paths**: Validate path syntax before resolution
-4. **Provide Defaults**: Use default values for missing attributes
+3. **Validate Paths**: Validate path syntax trước resolution
+4. **Provide Defaults**: Sử dụng default values cho missing attributes
 
-## Future Enhancements
+## Cải tiến Tương lai
 
-Planned improvements:
+Các cải tiến được lên kế hoạch:
 
-1. **Path Caching**: Cache resolved paths for better performance
-2. **Advanced Expressions**: Support for computed expressions and functions
-3. **Path Validation**: Enhanced path syntax validation and error reporting
-4. **Custom Resolvers**: Plugin system for custom resolution strategies
+1. **Path Caching**: Cache resolved paths để better performance
+2. **Advanced Expressions**: Hỗ trợ computed expressions và functions
+3. **Path Validation**: Enhanced path syntax validation và error reporting
+4. **Custom Resolvers**: Plugin system cho custom resolution strategies
 5. **Performance Monitoring**: Detailed resolution performance metrics
-6. **Path Optimization**: Automatic path optimization and suggestion
+6. **Path Optimization**: Automatic path optimization và suggestion

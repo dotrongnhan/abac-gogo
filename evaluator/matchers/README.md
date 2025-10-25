@@ -1,12 +1,12 @@
 # Matchers Package
 
-The matchers package provides specialized pattern matching for actions and resources in ABAC policies.
+Package matchers cung cấp specialized pattern matching cho actions và resources trong ABAC policies.
 
 ## Components
 
 ### ActionMatcher
 
-Handles action pattern matching with support for wildcards and hierarchical action structures.
+Xử lý action pattern matching với hỗ trợ wildcards và hierarchical action structures.
 
 #### Action Format
 Actions follow the format: `<service>:<resource-type>:<operation>`
@@ -60,7 +60,7 @@ matches = matcher.Match("*:*:read", "document-service:file:read")
 
 ### ResourceMatcher
 
-Handles resource pattern matching with support for hierarchical resources, wildcards, and variable substitution.
+Xử lý resource pattern matching với hỗ trợ hierarchical resources, wildcards, và variable substitution.
 
 #### Resource Format
 Resources follow the format: `<service>:<resource-type>:<resource-id>`
@@ -147,22 +147,22 @@ matches = matcher.Match("api:departments:${user:Department}/api:documents:*", "a
 ## Pattern Matching Algorithm
 
 ### Action Matching
-1. **Wildcard Check**: If pattern is `*`, return true
-2. **Segment Split**: Split both pattern and action by `:`
-3. **Length Validation**: Ensure same number of segments
-4. **Segment Matching**: Match each segment with wildcard support
+1. **Wildcard Check**: Nếu pattern là `*`, return true
+2. **Segment Split**: Split cả pattern và action theo `:`
+3. **Length Validation**: Đảm bảo same number of segments
+4. **Segment Matching**: Match mỗi segment với wildcard support
 
 ### Resource Matching
-1. **Wildcard Check**: If pattern is `*`, return true
+1. **Wildcard Check**: Nếu pattern là `*`, return true
 2. **Format Validation**: Validate resource format
-3. **Variable Substitution**: Replace `${variable}` with context values
-4. **Hierarchical Detection**: Check for `/` separator
+3. **Variable Substitution**: Replace `${variable}` với context values
+4. **Hierarchical Detection**: Check cho `/` separator
 5. **Pattern Matching**: Apply appropriate matching strategy
 
 ### Variable Substitution Algorithm
-1. **Pattern Detection**: Find `${...}` patterns using regex
-2. **Context Lookup**: Resolve variable from context
-3. **Replacement**: Replace pattern with resolved value
+1. **Pattern Detection**: Find `${...}` patterns sử dụng regex
+2. **Context Lookup**: Resolve variable từ context
+3. **Replacement**: Replace pattern với resolved value
 4. **Validation**: Validate final pattern format
 
 ## Validation
@@ -189,39 +189,39 @@ Patterns are validated for:
 ## Performance Optimizations
 
 ### Regex Compilation
-- Wildcard patterns are converted to regex for efficient matching
-- Compiled regex patterns could be cached (future enhancement)
+- Wildcard patterns được converted thành regex cho efficient matching
+- Compiled regex patterns có thể được cached (future enhancement)
 
 ### Early Termination
-- Quick checks for exact matches and full wildcards
-- Segment-by-segment matching stops on first mismatch
+- Quick checks cho exact matches và full wildcards
+- Segment-by-segment matching stops trên first mismatch
 
 ### Efficient String Operations
-- Minimal string manipulation for common cases
-- Direct string comparison when possible
+- Minimal string manipulation cho common cases
+- Direct string comparison khi có thể
 
 ## Error Handling
 
-The matchers package handles various error conditions:
+Package matchers xử lý various error conditions:
 
 ### Variable Resolution Errors
-- Missing variables in context are ignored (no substitution)
-- Invalid variable syntax is preserved as literal text
-- Type mismatches are handled gracefully
+- Missing variables trong context được ignored (no substitution)
+- Invalid variable syntax được preserved as literal text
+- Type mismatches được handled gracefully
 
 ### Format Validation Errors
 - Invalid resource formats return false (no match)
-- Malformed patterns are handled safely
-- Empty or null inputs are handled appropriately
+- Malformed patterns được handled safely
+- Empty hoặc null inputs được handled appropriately
 
 ## Testing
 
-Comprehensive test coverage includes:
+Comprehensive test coverage bao gồm:
 
 ### Action Matcher Tests
 - Exact matching scenarios
-- All wildcard combinations
-- Edge cases and invalid inputs
+- Tất cả wildcard combinations
+- Edge cases và invalid inputs
 - Performance benchmarks
 
 ### Resource Matcher Tests
@@ -231,7 +231,7 @@ Comprehensive test coverage includes:
 - Format validation tests
 - Error condition handling
 
-Run matcher tests:
+Chạy matcher tests:
 
 ```bash
 go test ./evaluator/matchers
@@ -284,29 +284,29 @@ go test ./evaluator/matchers -bench=.
 ## Best Practices
 
 ### Pattern Design
-1. **Be Specific**: Use the most specific pattern possible
-2. **Consistent Naming**: Follow consistent naming conventions
+1. **Be Specific**: Sử dụng most specific pattern có thể
+2. **Consistent Naming**: Tuân theo consistent naming conventions
 3. **Logical Hierarchy**: Design hierarchical resources logically
-4. **Variable Usage**: Use variables for user-specific resources
+4. **Variable Usage**: Sử dụng variables cho user-specific resources
 
 ### Performance
-1. **Avoid Deep Hierarchies**: Limit nesting depth for better performance
-2. **Cache Contexts**: Reuse context objects when possible
-3. **Pattern Ordering**: Order patterns from most to least specific
-4. **Minimize Variables**: Use variables judiciously to avoid overhead
+1. **Avoid Deep Hierarchies**: Giới hạn nesting depth để better performance
+2. **Cache Contexts**: Reuse context objects khi có thể
+3. **Pattern Ordering**: Order patterns từ most đến least specific
+4. **Minimize Variables**: Sử dụng variables judiciously để avoid overhead
 
 ### Security
-1. **Validate Patterns**: Always validate pattern syntax
-2. **Sanitize Variables**: Ensure variable values are safe
-3. **Principle of Least Privilege**: Use specific patterns over wildcards
+1. **Validate Patterns**: Luôn validate pattern syntax
+2. **Sanitize Variables**: Đảm bảo variable values are safe
+3. **Principle of Least Privilege**: Sử dụng specific patterns over wildcards
 4. **Audit Wildcards**: Carefully review wildcard usage
 
-## Future Enhancements
+## Cải tiến Tương lai
 
-Planned improvements:
+Các cải tiến được lên kế hoạch:
 
-1. **Pattern Caching**: Cache compiled regex patterns for better performance
-2. **Advanced Variables**: Support for computed variables and functions
-3. **Pattern Optimization**: Automatic pattern optimization and conflict detection
-4. **Custom Matchers**: Plugin system for custom matching logic
+1. **Pattern Caching**: Cache compiled regex patterns để better performance
+2. **Advanced Variables**: Hỗ trợ computed variables và functions
+3. **Pattern Optimization**: Automatic pattern optimization và conflict detection
+4. **Custom Matchers**: Plugin system cho custom matching logic
 5. **Performance Metrics**: Detailed matching performance monitoring
