@@ -215,7 +215,7 @@ Action pattern hỗ trợ **wildcard** (`*`) để match nhiều giá trị. Wil
 
 **Code logic:**
 ```go
-// File: evaluator/matching.go:19-21
+// File: evaluator/matchers/matching.go:19-21
 func (am *ActionMatcher) Match(pattern, action string) bool {
     if pattern == "*" {
         return true  // Match tất cả
@@ -365,7 +365,7 @@ func (am *ActionMatcher) Match(pattern, action string) bool {
 ### 5. Wildcard Implementation
 
 ```go
-// File: evaluator/matching.go:50-62
+// File: evaluator/matchers/matching.go:50-62
 func (am *ActionMatcher) matchWildcard(pattern, value string) bool {
     // Chuyển wildcard pattern thành regex
     regexPattern := strings.ReplaceAll(pattern, "*", ".*")
@@ -392,7 +392,7 @@ func (am *ActionMatcher) matchWildcard(pattern, value string) bool {
 ### 1. Quy trình Matching trong PDP
 
 ```go
-// File: evaluator/pdp.go:373-402
+// File: evaluator/core/pdp.go:373-402
 func (pdp *PolicyDecisionPoint) isActionMatched(
     actionSpec models.JSONActionResource,
     context map[string]interface{}
@@ -435,7 +435,7 @@ func (pdp *PolicyDecisionPoint) isActionMatched(
 ### 2. ActionMatcher.Match Logic
 
 ```go
-// File: evaluator/matching.go:16-37
+// File: evaluator/matchers/matching.go:16-37
 func (am *ActionMatcher) Match(pattern, action string) bool {
     // Step 1: Check full wildcard
     if pattern == "*" {
@@ -465,7 +465,7 @@ func (am *ActionMatcher) Match(pattern, action string) bool {
 ### 3. Segment Matching
 
 ```go
-// File: evaluator/matching.go:39-48
+// File: evaluator/matchers/matching.go:39-48
 func (am *ActionMatcher) matchSegment(pattern, value string) bool {
     // Case 1: Segment là wildcard "*"
     if pattern == "*" {
@@ -957,7 +957,7 @@ if len(patternParts) != len(actionParts) {
 
 **Code Logic:**
 ```go
-// File: evaluator/pdp.go:288-294
+// File: evaluator/core/pdp.go:288-294
 // Deny-Override algorithm
 if strings.ToLower(statement.Effect) == EffectDeny {
     return &models.Decision{
@@ -1376,7 +1376,7 @@ Wildcard chỉ hỗ trợ `*`, **KHÔNG** hỗ trợ regex phức tạp:
 Khi có nhiều patterns trong array, hệ thống **match lần lượt** cho đến khi tìm thấy match:
 
 ```go
-// File: evaluator/pdp.go:392-400
+// File: evaluator/core/pdp.go:392-400
 for _, actionPattern := range actionValues {
     if actionPattern == "" {
         continue
@@ -1421,7 +1421,7 @@ return false
 ### 1. Request Validation
 
 ```go
-// File: evaluator/pdp.go:99-104
+// File: evaluator/core/pdp.go:99-104
 if request == nil {
     return nil, fmt.Errorf("evaluation request cannot be nil")
 }
@@ -1441,7 +1441,7 @@ if request.SubjectID == "" || request.ResourceID == "" || request.Action == "" {
 ### 2. Context Validation
 
 ```go
-// File: evaluator/pdp.go:341-371
+// File: evaluator/core/pdp.go:341-371
 func (pdp *PolicyDecisionPoint) isValidEvaluationContext(
     context map[string]interface{}
 ) bool {
@@ -1483,7 +1483,7 @@ func (pdp *PolicyDecisionPoint) isValidEvaluationContext(
 ### 3. Action Pattern Validation
 
 ```go
-// File: evaluator/pdp.go:387-391
+// File: evaluator/core/pdp.go:387-391
 actionValues := actionSpec.GetValues()
 if len(actionValues) == 0 {
     log.Printf("Warning: No action patterns specified")
@@ -1542,15 +1542,15 @@ return &models.Decision{
 | Functionality | File | Lines |
 |--------------|------|-------|
 | Action Definition | `models/types.go` | 134-219 |
-| Action Matching | `evaluator/matching.go` | 8-62 |
-| Action Evaluation | `evaluator/pdp.go` | 373-402 |
+| Action Matching | `evaluator/matchers/matching.go` | 8-62 |
+| Action Evaluation | `evaluator/core/pdp.go` | 373-402 |
 | Policy Statement | `models/types.go` | 298-306 |
 | Evaluation Request | `models/types.go` | 315-324 |
 
 ### Key Constants
 
 ```go
-// File: evaluator/pdp.go:45-46
+// File: evaluator/core/pdp.go:45-46
 ContextKeyRequestAction = "request:Action"
 ```
 
@@ -1615,6 +1615,7 @@ func (pdp *PolicyDecisionPoint) isActionMatched(
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2025-10-24
-**Based on:** `evaluator/pdp.go`, `evaluator/matching.go`, `models/types.go`
+**Document Version:** 1.1
+**Last Updated:** 2025-10-25
+**Based on:** `evaluator/core/pdp.go`, `evaluator/matchers/matching.go`, `models/types.go`
+**Updated:** Cập nhật theo cấu trúc package mới và enhanced evaluator

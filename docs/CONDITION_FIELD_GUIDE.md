@@ -2212,9 +2212,9 @@ Sử dụng `${...}` để tham chiếu context values trong conditions:
 
 ### Code Implementation
 Xem chi tiết implementation tại:
-- `evaluator/conditions.go` - Condition evaluator cơ bản với traditional operators
-- `evaluator/enhanced_condition_evaluator.go` - Enhanced evaluator với advanced operators
-- `evaluator/pdp.go` - Policy Decision Point với full evaluation logic
+- `evaluator/conditions/conditions.go` - Condition evaluator cơ bản với traditional operators
+- `evaluator/conditions/enhanced_condition_evaluator.go` - Enhanced evaluator với advanced operators
+- `evaluator/core/pdp.go` - Policy Decision Point với full evaluation logic
 
 ### Example Policies
 - `policy_examples_corrected.json` - Các ví dụ policy được validate
@@ -2223,13 +2223,12 @@ Xem chi tiết implementation tại:
 
 ## Changelog
 
-**Version 1.0.0** (2025-01-24)
-- Initial comprehensive documentation
-- All operators documented with examples
-- Variable substitution guide
-- Type conversion details
-- Troubleshooting section
-- Common use cases cheat sheet
+**Version 1.1.0** (2025-10-25)
+- Updated cho enhanced condition evaluator architecture
+- Cập nhật file paths theo cấu trúc package mới
+- Thêm thông tin về EnhancedConditionEvaluator
+- Cập nhật examples với enhanced operators
+- Improved troubleshooting guide
 
 ---
 

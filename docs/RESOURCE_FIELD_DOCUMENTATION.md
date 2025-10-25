@@ -193,7 +193,7 @@ Resource pattern hỗ trợ **wildcard** (`*`) để match nhiều resources. Wi
 
 **Code logic:**
 ```go
-// File: evaluator/matching.go:76-79
+// File: evaluator/matchers/matching.go:76-79
 func (rm *ResourceMatcher) Match(pattern, resource string, context map[string]interface{}) bool {
     if pattern == "*" {
         return true  // Match tất cả
@@ -393,7 +393,7 @@ ${context-key}
 ### 3. Variable Substitution Logic
 
 ```go
-// File: evaluator/matching.go:223-243
+// File: evaluator/matchers/matching.go:223-243
 func (rm *ResourceMatcher) substituteVariables(pattern string, context map[string]interface{}) string {
     result := pattern
 
@@ -545,7 +545,7 @@ Hierarchical resources cho phép biểu diễn cấu trúc **parent/child** ho�
 ### 4. Hierarchical Matching Logic
 
 ```go
-// File: evaluator/matching.go:120-136
+// File: evaluator/matchers/matching.go:120-136
 func (rm *ResourceMatcher) matchHierarchical(pattern, resource string) bool {
     // Split by '/' first, then by ':'
     patternParts := rm.parseHierarchical(pattern)
@@ -698,7 +698,7 @@ type PolicyStatement struct {
 ### 3. NotResource Evaluation Logic
 
 ```go
-// File: evaluator/pdp.go:406-425
+// File: evaluator/core/pdp.go:406-425
 func (pdp *PolicyDecisionPoint) isResourceMatched(statement models.PolicyStatement, context map[string]interface{}) bool {
     requestedResource, ok := context[ContextKeyRequestResourceID].(string)
     if !ok {
@@ -819,7 +819,7 @@ func (pdp *PolicyDecisionPoint) isResourceMatched(statement models.PolicyStateme
 ### 1. Quy trình Resource Matching trong PDP
 
 ```go
-// File: evaluator/pdp.go:406-425
+// File: evaluator/core/pdp.go:406-425
 func (pdp *PolicyDecisionPoint) isResourceMatched(
     statement models.PolicyStatement,
     context map[string]interface{}
@@ -850,7 +850,7 @@ func (pdp *PolicyDecisionPoint) isResourceMatched(
 ### 2. ResourceMatcher.Match Logic
 
 ```go
-// File: evaluator/matching.go:72-101
+// File: evaluator/matchers/matching.go:72-101
 func (rm *ResourceMatcher) Match(pattern, resource string, context map[string]interface{}) bool {
     // Step 1: Check full wildcard
     if pattern == "*" {
@@ -950,7 +950,7 @@ Context: {"request:UserId": "user-123"}
 
 #### a) Resource Format Validation
 ```go
-// File: evaluator/matching.go:173-221
+// File: evaluator/matchers/matching.go:173-221
 func (rm *ResourceMatcher) validateResourceFormat(resource string) bool {
     if resource == "*" {
         return true
@@ -1569,7 +1569,7 @@ NotResource **phải đi kèm** với Resource:
 ### 1. Resource Format Validation
 
 ```go
-// File: evaluator/matching.go:173-221
+// File: evaluator/matchers/matching.go:173-221
 func (rm *ResourceMatcher) validateResourceFormat(resource string) bool {
     if resource == "*" {
         return true
@@ -1624,7 +1624,7 @@ func (rm *ResourceMatcher) validateSimpleResourceFormat(resource string) bool {
 ### 2. Context Validation
 
 ```go
-// File: evaluator/pdp.go:407-416
+// File: evaluator/core/pdp.go:407-416
 requestedResource, ok := context[ContextKeyRequestResourceID].(string)
 if !ok {
     log.Printf("Warning: Missing or invalid resource ID in context")
@@ -1663,15 +1663,15 @@ Request → Validate Request → Validate Context → Match Resources
 | Functionality | File | Lines |
 |--------------|------|-------|
 | Resource Definition | `models/types.go` | 134-219 |
-| Resource Matching | `evaluator/matching.go` | 64-243 |
-| Resource Evaluation | `evaluator/pdp.go` | 406-452 |
-| Variable Substitution | `evaluator/matching.go` | 223-243 |
-| Format Validation | `evaluator/matching.go` | 173-221 |
+| Resource Matching | `evaluator/matchers/matching.go` | 64-243 |
+| Resource Evaluation | `evaluator/core/pdp.go` | 406-452 |
+| Variable Substitution | `evaluator/matchers/matching.go` | 223-243 |
+| Format Validation | `evaluator/matchers/matching.go` | 173-221 |
 
 ### Key Constants
 
 ```go
-// File: evaluator/pdp.go
+// File: evaluator/core/pdp.go
 ContextKeyRequestResourceID = "request:ResourceId"
 ```
 
@@ -1750,6 +1750,7 @@ func (pdp *PolicyDecisionPoint) matchesNotResourcePatterns(
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2025-10-24
-**Based on:** `evaluator/pdp.go`, `evaluator/matching.go`, `models/types.go`
+**Document Version:** 1.1
+**Last Updated:** 2025-10-25
+**Based on:** `evaluator/core/pdp.go`, `evaluator/matchers/matching.go`, `models/types.go`
+**Updated:** Cập nhật theo cấu trúc package mới và enhanced matchers
