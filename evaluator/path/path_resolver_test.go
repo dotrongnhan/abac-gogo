@@ -1,4 +1,4 @@
-package evaluator
+package path
 
 import (
 	"testing"
@@ -441,7 +441,7 @@ func TestShortcutResolver_CustomConfig(t *testing.T) {
 	// Test with custom shortcut configurations
 	customShortcuts := []ShortcutConfig{
 		{Prefix: "user", TargetPath: []string{"attributes"}},
-		{Prefix: "resource", TargetPath: []string{"metadata"}}, // Different from default
+		{Prefix: "resource", TargetPath: []string{"metadata"}},      // Different from default
 		{Prefix: "environment", TargetPath: []string{"properties"}}, // New shortcut
 	}
 	resolver := NewShortcutResolver(customShortcuts)

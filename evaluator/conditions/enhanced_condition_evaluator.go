@@ -1,4 +1,4 @@
-package evaluator
+package conditions
 
 import (
 	"fmt"
@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"abac_go_example/evaluator/path"
 )
 
 // EnhancedConditionEvaluator provides advanced condition evaluation capabilities
@@ -14,14 +16,14 @@ type EnhancedConditionEvaluator struct {
 	// Cache for compiled regex patterns
 	regexCache map[string]*regexp.Regexp
 	// Path resolver for attribute access
-	pathResolver PathResolver
+	pathResolver path.PathResolver
 }
 
 // NewEnhancedConditionEvaluator creates a new enhanced condition evaluator
 func NewEnhancedConditionEvaluator() *EnhancedConditionEvaluator {
 	return &EnhancedConditionEvaluator{
 		regexCache:   make(map[string]*regexp.Regexp),
-		pathResolver: NewCompositePathResolver(),
+		pathResolver: path.NewCompositePathResolver(),
 	}
 }
 
@@ -846,7 +848,6 @@ func (ece *EnhancedConditionEvaluator) getValueFromContext(attributePath string,
 	value, _ := ece.pathResolver.Resolve(attributePath, context)
 	return value
 }
-
 
 func (ece *EnhancedConditionEvaluator) toString(value interface{}) string {
 	if value == nil {

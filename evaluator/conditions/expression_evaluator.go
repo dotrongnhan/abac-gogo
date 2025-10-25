@@ -1,4 +1,4 @@
-package evaluator
+package conditions
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package evaluator
+package core
 
 import (
 	"fmt"
@@ -322,11 +322,11 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					DayOfWeek: "Thursday",
 				},
 				Context: map[string]interface{}{
-					"subject_type":                "employee",
-					"department":                  "Engineering Team",
-					"level":                       5,
-					"is_business_hours":           true,
-					"client_ip":                   "192.168.1.100",
+					"subject_type":      "employee",
+					"department":        "Engineering Team",
+					"level":             5,
+					"is_business_hours": true,
+					"client_ip":         "192.168.1.100",
 				},
 			},
 			expectedResult: "permit",

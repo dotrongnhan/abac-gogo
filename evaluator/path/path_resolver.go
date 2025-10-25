@@ -1,4 +1,4 @@
-package evaluator
+package path
 
 import (
 	"strings"
@@ -68,6 +68,11 @@ func (dpr *DirectPathResolver) Resolve(path string, context map[string]interface
 
 // DotNotationResolver handles nested path access using dot notation
 type DotNotationResolver struct{}
+
+// NewDotNotationResolver creates a new dot notation resolver
+func NewDotNotationResolver() *DotNotationResolver {
+	return &DotNotationResolver{}
+}
 
 func (dnr *DotNotationResolver) Resolve(path string, context map[string]interface{}) (interface{}, bool) {
 	// Only process paths with dots

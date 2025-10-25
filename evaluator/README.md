@@ -1,770 +1,280 @@
-# Evaluator Package - Policy Decision Point (PDP)
+# ABAC Evaluator Package
 
-## 📋 Tổng Quan
+The evaluator package provides a comprehensive Attribute-Based Access Control (ABAC) policy evaluation system. This package has been refactored to use a clean, modular architecture with the enhanced condition evaluator as the primary evaluation engine.
 
-Package `evaluator` chứa **Policy Decision Point (PDP)** - core engine của hệ thống ABAC (Attribute-Based Access Control). Đây là component chính thực hiện policy evaluation và đưa ra quyết định access control dựa trên attributes của subject, resource, action và environment context.
+## Architecture Overview
 
-## 🎯 Trách Nhiệm Chính
-
-1. **Policy Evaluation**: Đánh giá access requests dựa trên defined policies
-2. **Decision Making**: Đưa ra quyết định PERMIT/DENY/NOT_APPLICABLE
-3. **Rule Processing**: Xử lý complex rule logic với multiple conditions
-4. **Pattern Matching**: Hỗ trợ wildcard và variable substitution cho actions/resources
-5. **Condition Evaluation**: Đánh giá điều kiện phức tạp với nhiều operators
-6. **Performance Optimization**: Fast evaluation với short-circuit logic và deny-override
-
-## 📁 Cấu Trúc Files
+The evaluator package is organized into several specialized subpackages:
 
 ```
 evaluator/
-├── pdp.go                  # Policy Decision Point - Main evaluation engine
-├── conditions.go           # Condition evaluation với nhiều operators
-├── matching.go            # Action và Resource pattern matching
-├── new_policy_test.go     # Comprehensive unit tests
-└── README.md              # Documentation (file này)
+├── core/                    # Core PDP and policy validation
+├── conditions/              # Condition evaluation engines
+├── matchers/               # Action and resource matching
+├── path/                   # Path resolution utilities
+└── evaluator.go            # Package documentation and usage guide
 ```
 
-## 🏗️ Core Architecture
+## Package Structure
 
-### 1. PolicyDecisionPointInterface - Main Contract
+### Core Package (`evaluator/core`)
+
+Contains the main Policy Decision Point (PDP) and policy validation components:
+
+- **PolicyDecisionPoint**: Main evaluation engine implementing deny-override algorithm
+- **PolicyValidator**: Validates policy syntax and structure
+- **Integration tests**: Comprehensive end-to-end testing
+
+#### Key Features:
+- Deny-override policy combining algorithm
+- Enhanced context building with time-based and environmental attributes
+- Structured subject and resource attribute handling
+- Performance optimizations with configurable limits
+
+### Conditions Package (`evaluator/conditions`)
+
+Advanced condition evaluation with support for complex logical expressions:
+
+- **EnhancedConditionEvaluator**: Primary condition evaluation engine
+- **ExpressionEvaluator**: Boolean expression evaluation
+- **ComplexCondition**: Legacy condition structure for backward compatibility
+
+#### Supported Operators:
+
+**String Operators:**
+- `StringEquals`, `StringNotEquals`, `StringLike`
+- `StringContains`, `StringStartsWith`, `StringEndsWith`
+- `StringRegex` (with caching for performance)
+
+**Numeric Operators:**
+- `NumericEquals`, `NumericNotEquals`
+- `NumericLessThan`, `NumericLessThanEquals`
+- `NumericGreaterThan`, `NumericGreaterThanEquals`
+- `NumericBetween`
+
+**Date/Time Operators:**
+- `DateLessThan`, `DateLessThanEquals`
+- `DateGreaterThan`, `DateGreaterThanEquals`
+- `DateBetween`, `DayOfWeek`, `TimeOfDay`
+- `IsBusinessHours`
+
+**Array Operators:**
+- `ArrayContains`, `ArrayNotContains`
+- `ArraySize` (with comparison operators)
+
+**Network Operators:**
+- `IPInRange`, `IPNotInRange`
+- `IsInternalIP`
+
+**Logical Operators:**
+- `And`, `Or`, `Not`
+
+### Matchers Package (`evaluator/matchers`)
+
+Handles action and resource pattern matching:
+
+- **ActionMatcher**: Matches action patterns with wildcard support
+- **ResourceMatcher**: Matches resource patterns with hierarchical support and variable substitution
+
+#### Pattern Formats:
+- Actions: `<service>:<resource-type>:<operation>`
+- Resources: `<service>:<resource-type>:<resource-id>`
+- Hierarchical: `<parent>/<child>` structure
+- Variables: `${variable}` substitution from context
+
+### Path Package (`evaluator/path`)
+
+Provides flexible attribute path resolution:
+
+- **CompositePathResolver**: Combines multiple resolution strategies
+- **DotNotationResolver**: Handles nested object access (`user.department`)
+- **PathNormalizer**: Normalizes and validates attribute paths
+
+## Usage Examples
+
+### Basic Policy Evaluation
 
 ```go
-type PolicyDecisionPointInterface interface {
-    // Optimized evaluation method combining best practices
-    Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
-}
-```
+import (
+    "abac_go_example/evaluator/core"
+    "abac_go_example/storage"
+)
 
-**Benefits của Interface:**
-- **Testability**: Dễ dàng tạo mock implementations cho testing
-- **Flexibility**: Có thể swap implementations mà không thay đổi client code
-- **Dependency Injection**: Clean dependency management
-- **Abstraction**: Hide implementation details từ consumers
+// Create PDP with storage backend
+pdp := core.NewPolicyDecisionPoint(storage)
 
-### 2. PolicyDecisionPoint (PDP) - Concrete Implementation
-
-```go
-type PolicyDecisionPoint struct {
-    storage            storage.Storage              // Data access layer
-    attributeResolver  *attributes.AttributeResolver // Attribute resolution
-    operatorRegistry   *operators.OperatorRegistry  // Rule operators (legacy)
-    actionMatcher      *ActionMatcher              // Action pattern matching
-    resourceMatcher    *ResourceMatcher            // Resource pattern matching  
-    conditionEvaluator *ConditionEvaluator         // Condition evaluation
-}
-```
-
-**Key Dependencies:**
-- **Storage**: Access policies, subjects, resources, actions
-- **AttributeResolver**: Enrich context với full attributes
-- **ActionMatcher**: Match action patterns với wildcards
-- **ResourceMatcher**: Match resource patterns với variable substitution
-- **ConditionEvaluator**: Evaluate complex conditions
-
-### 3. ActionMatcher - Action Pattern Matching
-
-```go
-type ActionMatcher struct{}
-```
-
-**Supported Patterns:**
-- **Exact match**: `document-service:file:read`
-- **Wildcard segments**: `document-service:file:*`, `*:*:read`
-- **Full wildcard**: `*` (matches anything)
-
-**Pattern Format**: `<service>:<resource-type>:<operation>`
-
-### 4. ResourceMatcher - Resource Pattern Matching
-
-```go
-type ResourceMatcher struct{}
-```
-
-**Supported Patterns:**
-- **Exact match**: `api:documents:doc-123`
-- **Wildcard segments**: `api:documents:*`, `api:*:doc-123`
-- **Variable substitution**: `api:documents:owner:${request:UserId}/*`
-- **Hierarchical resources**: `api:documents:folder-1/file-2`
-
-### 5. ConditionEvaluator - Complex Condition Logic
-
-```go
-type ConditionEvaluator struct{}
-```
-
-**Supported Operators:**
-- **String**: `StringEquals`, `StringNotEquals`, `StringLike`
-- **Numeric**: `NumericLessThan`, `NumericGreaterThan`, etc.
-- **Boolean**: `Bool`
-- **Network**: `IpAddress` (CIDR support)
-- **Date/Time**: `DateGreaterThan`, `DateLessThan`
-- **Logical**: `And`, `Or`, `Not` (for complex nested conditions)
-
-## 🔄 Evaluation Flow Chi Tiết
-
-### Main Evaluation Process
-
-```mermaid
-graph TD
-    A[EvaluationRequest] --> B[EnrichContext]
-    B --> C[GetAllPolicies]
-    C --> D[BuildEvaluationContext]
-    D --> E[EvaluateNewPolicies]
-    E --> F[ApplyDenyOverride]
-    F --> G[ReturnDecision]
-```
-
-### Step-by-Step Process
-
-#### Step 1: Context Enrichment
-```go
-context, err := pdp.attributeResolver.EnrichContext(request)
-```
-
-**Input**: Basic EvaluationRequest
-```json
-{
-  "subject_id": "user-123",
-  "resource_id": "api:documents:doc-456", 
-  "action": "document-service:file:read",
-  "context": {
-    "source_ip": "192.168.1.100",
-    "timestamp": "2024-01-15T14:00:00Z"
-  }
-}
-```
-
-**Output**: Rich EvaluationContext với full attributes
-
-#### Step 2: Build Evaluation Context
-```go
-evalContext := pdp.buildEvaluationContext(request, context)
-```
-
-**Context Structure:**
-```go
-map[string]interface{}{
-    // Request context
-    "request:UserId":     "user-123",
-    "request:Action":     "document-service:file:read", 
-    "request:ResourceId": "api:documents:doc-456",
-    "request:Time":       "2024-01-15T14:00:00Z",
-    
-    // User attributes
-    "user:department":    "engineering",
-    "user:role":         "senior_developer",
-    "user:level":        5,
-    
-    // Resource attributes  
-    "resource:owner":     "user-456",
-    "resource:sensitivity": "confidential",
-    
-    // Environment
-    "environment:source_ip": "192.168.1.100",
-}
-```
-
-#### Step 3: Policy Evaluation với Deny-Override
-
-```go
-decision := pdp.evaluateNewPolicies(allPolicies, evalContext)
-```
-
-**Deny-Override Algorithm:**
-1. **Evaluate all statements** trong tất cả enabled policies
-2. **If any DENY statement matches** → Return DENY immediately (short-circuit)
-3. **If any ALLOW statement matches** → Return PERMIT
-4. **No matches** → Return DENY (implicit deny)
-
-## 📝 Policy Format Support
-
-### New JSON Policy Format (Recommended)
-
-```json
-{
-  "Version": "2024-01-01",
-  "Id": "engineering-document-access",
-  "Statement": [
-    {
-      "Sid": "AllowEngineeringRead",
-      "Effect": "Allow",
-      "Action": {
-        "StringEquals": ["document-service:file:read"]
-      },
-      "Resource": {
-        "StringLike": ["api:documents:*"]
-      },
-      "Condition": {
-        "StringEquals": {
-          "user:department": "engineering"
-        },
-        "NumericGreaterThanEquals": {
-          "user:level": 3
-        }
-      }
-    }
-  ]
-}
-```
-
-### Legacy Policy Format (Still Supported)
-
-```json
-{
-  "id": "pol-001",
-  "policy_name": "Engineering Read Access",
-  "effect": "permit",
-  "priority": 100,
-  "actions": ["read"],
-  "resource_patterns": ["/api/v1/*"],
-  "rules": [
-    {
-      "target_type": "subject",
-      "attribute_path": "attributes.department",
-      "operator": "eq",
-      "expected_value": "engineering"
-    }
-  ]
-}
-```
-
-## 🔍 Pattern Matching Examples
-
-### Action Patterns
-
-```go
-// Exact match
-"document-service:file:read" matches "document-service:file:read" ✅
-"document-service:file:read" matches "document-service:file:write" ❌
-
-// Wildcard patterns  
-"document-service:file:*" matches "document-service:file:read" ✅
-"document-service:*:read" matches "document-service:folder:read" ✅
-"*:*:read" matches "payment-service:transaction:read" ✅
-"*" matches "any:action:here" ✅
-```
-
-### Resource Patterns
-
-```go
-// Basic patterns
-"api:documents:*" matches "api:documents:doc-123" ✅
-"api:*:doc-123" matches "api:documents:doc-123" ✅
-
-// Variable substitution
-"api:documents:owner:${request:UserId}/*" 
-  → "api:documents:owner:user-123/*"
-  → matches "api:documents:owner:user-123/file-1" ✅
-
-// Hierarchical resources
-"api:documents:folder-1/*" matches "api:documents:folder-1/file-2" ✅
-```
-
-## 🧮 Condition Evaluation Examples
-
-### String Conditions
-
-```json
-{
-  "StringEquals": {
-    "user:department": "engineering"
-  },
-  "StringLike": {
-    "resource:path": "/documents/eng-*"
-  }
-}
-```
-
-### Numeric Conditions
-
-```json
-{
-  "NumericGreaterThanEquals": {
-    "user:level": 3
-  },
-  "NumericLessThan": {
-    "resource:size": 1000000
-  }
-}
-```
-
-### IP Address Conditions
-
-```json
-{
-  "IpAddress": {
-    "request:source_ip": ["192.168.1.0/24", "10.0.0.0/8"]
-  }
-}
-```
-
-### Complex Logical Conditions
-
-The system now supports complex logical operations with `And`, `Or`, and `Not` operators for nested conditions.
-
-#### Simple AND Operation
-```json
-{
-  "And": [
-    {
-      "StringEquals": {
-        "user:department": "engineering"
-      }
-    },
-    {
-      "NumericGreaterThan": {
-        "user:level": 5
-      }
-    }
-  ]
-}
-```
-
-#### Simple OR Operation
-```json
-{
-  "Or": [
-    {
-      "StringEquals": {
-        "user:role": "admin"
-      }
-    },
-    {
-      "StringEquals": {
-        "user:department": "security"
-      }
-    }
-  ]
-}
-```
-
-#### NOT Operation
-```json
-{
-  "Not": {
-    "Bool": {
-      "user:on_probation": true
-    }
-  }
-}
-```
-
-#### Nested Complex Conditions
-```json
-{
-  "And": [
-    {
-      "Or": [
-        {
-          "StringEquals": {
-            "user:department": "engineering"
-          }
-        },
-        {
-          "StringEquals": {
-            "user:role": "admin"
-          }
-        }
-      ]
-    },
-    {
-      "NumericGreaterThanEquals": {
-        "user:level": 5
-      }
-    },
-    {
-      "Not": {
-        "Bool": {
-          "user:on_probation": true
-        }
-      }
-    }
-  ]
-}
-```
-
-#### Multiple Levels of Nesting
-```json
-{
-  "Or": [
-    {
-      "And": [
-        {
-          "StringEquals": {
-            "user:role": "admin"
-          }
-        },
-        {
-          "IpAddress": {
-            "request:sourceIp": ["10.0.0.0/8"]
-          }
-        }
-      ]
-    },
-    {
-      "And": [
-        {
-          "StringEquals": {
-            "user:department": "engineering"
-          }
-        },
-        {
-          "NumericGreaterThan": {
-            "user:level": 7
-          }
-        },
-        {
-          "Not": {
-            "Bool": {
-              "user:on_probation": true
-            }
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-#### Using ComplexCondition Struct (Programmatic)
-```go
-condition := &ComplexCondition{
-    Type:     "logical",
-    Operator: ConditionAnd,
-    Left: &ComplexCondition{
-        Type:     "simple",
-        Operator: ConditionStringEquals,
-        Key:      "user.department",
-        Value:    "engineering",
-    },
-    Right: &ComplexCondition{
-        Type:     "logical",
-        Operator: ConditionNot,
-        Operand: &ComplexCondition{
-            Type:     "simple",
-            Operator: ConditionBool,
-            Key:      "user.on_probation",
-            Value:    true,
-        },
+// Create evaluation request
+request := &models.EvaluationRequest{
+    SubjectID:  "user-123",
+    ResourceID: "api:documents:doc-456",
+    Action:     "document-service:file:read",
+    Context: map[string]interface{}{
+        "department": "engineering",
     },
 }
 
-result := evaluator.EvaluateComplex(condition, context)
-```
-
-### Date/Time Conditions
-
-```json
-{
-  "DateGreaterThan": {
-    "request:time": "2024-01-01T00:00:00Z"
-  }
-}
-```
-
-### Variable Substitution
-
-```json
-{
-  "StringEquals": {
-    "resource:owner": "${request:UserId}"
-  }
-}
-```
-
-## 🚀 Evaluation Examples
-
-### Example 1: Engineering Document Access
-
-**Request:**
-```json
-{
-  "subject_id": "user-123",
-  "resource_id": "api:documents:doc-456",
-  "action": "document-service:file:read"
-}
-```
-
-**Policy Statement:**
-```json
-{
-  "Effect": "Allow",
-  "Action": {"StringEquals": ["document-service:file:read"]},
-  "Resource": {"StringLike": ["api:documents:*"]},
-  "Condition": {
-    "StringEquals": {"user:department": "engineering"},
-    "NumericGreaterThanEquals": {"user:level": 3}
-  }
-}
-```
-
-**Evaluation Steps:**
-1. **Action Match**: `document-service:file:read` == `document-service:file:read` ✅
-2. **Resource Match**: `api:documents:doc-456` matches `api:documents:*` ✅  
-3. **Condition Check**:
-   - `user:department` == `"engineering"` ✅
-   - `user:level` >= `3` (5 >= 3) ✅
-
-**Result**: PERMIT ✅
-
-### Example 2: Deny Override Example
-
-**Request:**
-```json
-{
-  "subject_id": "user-probation",
-  "resource_id": "api:documents:confidential-doc",
-  "action": "document-service:file:write"
-}
-```
-
-**Policy Statements:**
-1. **Allow Statement** (matches):
-   ```json
-   {
-     "Effect": "Allow",
-     "Action": {"StringEquals": ["document-service:file:write"]},
-     "Resource": {"StringLike": ["api:documents:*"]}
-   }
-   ```
-
-2. **Deny Statement** (also matches):
-   ```json
-   {
-     "Effect": "Deny", 
-     "Action": {"StringEquals": ["document-service:file:write"]},
-     "Condition": {
-       "Bool": {"user:on_probation": true}
-     }
-   }
-   ```
-
-**Result**: DENY ❌ (Deny overrides Allow)
-
-## ⚡ Performance Features
-
-### 1. Deny-Override Short-Circuit
-```go
-if strings.ToLower(statement.Effect) == "deny" {
-    return &models.Decision{
-        Result: "deny",
-        Reason: fmt.Sprintf("Denied by statement: %s", statement.Sid),
-    }
-}
-```
-
-### 2. Early Pattern Matching
-- Action patterns checked first (fastest)
-- Resource patterns checked second  
-- Conditions evaluated last (most expensive)
-
-### 3. Efficient Wildcard Matching
-- Regex compilation cached
-- Simple string operations for basic patterns
-- Optimized for common patterns
-
-### 4. Variable Substitution Caching
-- Context values resolved once
-- Variable substitution performed efficiently
-- Nested object access optimized
-
-## 🧪 Testing Strategy
-
-### Unit Tests Coverage
-
-```go
-func TestActionMatcher(t *testing.T) {
-    // Tests exact matches, wildcards, edge cases
-}
-
-func TestResourceMatcher(t *testing.T) {
-    // Tests patterns, variables, hierarchical resources
-}
-
-func TestConditionEvaluator(t *testing.T) {
-    // Tests all operators, type conversions, edge cases
-}
-
-func TestPolicyEvaluation(t *testing.T) {
-    // Tests complete evaluation flow
-}
-```
-
-### Test Categories
-
-1. **Pattern Matching Tests**:
-   - Exact matches
-   - Wildcard patterns  
-   - Variable substitution
-   - Edge cases
-
-2. **Condition Tests**:
-   - All operator types
-   - Type conversions
-   - Null/empty values
-   - Complex nested conditions
-
-3. **Integration Tests**:
-   - Complete evaluation flow
-   - Multiple policies
-   - Deny-override scenarios
-   - Performance benchmarks
-
-## 🔒 Security Features
-
-### 1. Fail-Safe Defaults
-```go
-// Default to DENY on errors
-if err != nil {
-    return &models.Decision{
-        Result: "deny",
-        Reason: "Evaluation error - access denied for safety",
-    }
-}
-```
-
-### 2. Input Validation
-```go
-if request.SubjectID == "" || request.ResourceID == "" {
-    return nil, fmt.Errorf("invalid request: missing required fields")
-}
-```
-
-### 3. Deny-Override Policy
-- DENY statements always override ALLOW statements
-- Explicit deny beats implicit allow
-- No policy match = implicit deny
-
-### 4. Variable Injection Protection
-- Safe variable substitution
-- No code execution in patterns
-- Bounded recursion depth
-
-## 📊 API Methods
-
-### Interface Usage
-
-```go
-// Create PDP instance using interface (recommended)
-var pdp PolicyDecisionPointInterface = NewPolicyDecisionPoint(storage)
-
-// Use the optimized evaluation method
+// Evaluate request
 decision, err := pdp.Evaluate(request)
 if err != nil {
     log.Fatal(err)
 }
+
+fmt.Printf("Decision: %s, Reason: %s\n", decision.Result, decision.Reason)
 ```
 
-### Constructor Methods
+### Advanced Condition Evaluation
 
 ```go
-// Returns interface (recommended for production)
-func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterface
-```
+import "abac_go_example/evaluator/conditions"
 
-### Main Evaluation Method
+evaluator := conditions.NewEnhancedConditionEvaluator()
 
-```go
-// Optimized evaluation combining best practices from legacy approaches
-func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*models.Decision, error)
-```
-
-### Testing với Interface
-
-```go
-// Mock implementation for testing
-type MockPDP struct {
-    decisions map[string]*models.Decision
-}
-
-func (m *MockPDP) Evaluate(req *models.EvaluationRequest) (*models.Decision, error) {
-    key := fmt.Sprintf("%s:%s:%s", req.SubjectID, req.ResourceID, req.Action)
-    if decision, exists := m.decisions[key]; exists {
-        return decision, nil
-    }
-    return &models.Decision{Result: "deny"}, nil
-}
-
-// MockPDP now only needs to implement Evaluate method
-
-// Usage in tests
-func TestSomeFeature(t *testing.T) {
-    mockPDP := &MockPDP{
-        decisions: map[string]*models.Decision{
-            "user-123:doc-456:read": {Result: "permit"},
+conditions := map[string]interface{}{
+    "And": []interface{}{
+        map[string]interface{}{
+            "StringEquals": map[string]interface{}{
+                "user.department": "engineering",
+            },
         },
-    }
-    
-    // Use mockPDP as PolicyDecisionPointInterface
-    var pdp PolicyDecisionPointInterface = mockPDP
-    decision, err := pdp.Evaluate(request)
-    // ... test assertions
+        map[string]interface{}{
+            "NumericGreaterThan": map[string]interface{}{
+                "user.level": 3,
+            },
+        },
+        map[string]interface{}{
+            "IsBusinessHours": map[string]interface{}{
+                "environment.current_time": true,
+            },
+        },
+    },
 }
+
+context := map[string]interface{}{
+    "user": map[string]interface{}{
+        "department": "engineering",
+        "level":      5,
+    },
+    "environment": map[string]interface{}{
+        "current_time": time.Now(),
+    },
+}
+
+result := evaluator.EvaluateConditions(conditions, context)
 ```
 
-### Helper Methods
+### Action and Resource Matching
 
 ```go
-// Build evaluation context
-func (pdp *PolicyDecisionPoint) buildEvaluationContext(request, context) map[string]interface{}
+import "abac_go_example/evaluator/matchers"
 
-// Evaluate single statement
-func (pdp *PolicyDecisionPoint) evaluateStatement(statement, context) bool
+// Action matching
+actionMatcher := matchers.NewActionMatcher()
+matches := actionMatcher.Match("document-service:file:*", "document-service:file:read")
 
-// Pattern matching
-func (am *ActionMatcher) Match(pattern, action string) bool
-func (rm *ResourceMatcher) Match(pattern, resource string, context map[string]interface{}) bool
-
-// Condition evaluation
-func (ce *ConditionEvaluator) Evaluate(conditions, context map[string]interface{}) bool
+// Resource matching with variables
+resourceMatcher := matchers.NewResourceMatcher()
+context := map[string]interface{}{
+    "request:UserId": "user-123",
+}
+matches = resourceMatcher.Match("api:documents:owner-${request:UserId}", "api:documents:owner-user-123", context)
 ```
 
-## 🎯 Best Practices
+## Configuration and Constants
 
-### 1. Interface Usage
-- **Use interface in production**: `NewPolicyDecisionPoint()` returns interface
-- **Mock for unit tests**: Create mock implementations of interface
-- **Dependency injection**: Pass interface to consumers, not concrete type
+The system uses constants defined in the `constants` package:
 
-### 2. Policy Design
-- **Keep statements focused**: One statement per specific use case
-- **Use descriptive Sid**: Clear statement identifiers
-- **Prefer ALLOW over DENY**: Use DENY sparingly for security policies
-- **Order by specificity**: More specific conditions first
+- **Policy Effects**: `EffectAllow`, `EffectDeny`
+- **Decision Results**: `ResultPermit`, `ResultDeny`
+- **Context Keys**: Standardized context key prefixes and names
+- **Condition Operators**: All supported condition operator types
 
-### 3. Pattern Design
-- **Use wildcards judiciously**: Balance flexibility vs security
-- **Leverage variable substitution**: Dynamic resource matching
-- **Test pattern edge cases**: Ensure patterns work as expected
+## Performance Considerations
 
-### 4. Condition Design
-- **Combine operators logically**: All conditions in a block are AND-ed
-- **Use appropriate operators**: Choose the right operator for data type
-- **Handle null values**: Consider missing attributes in conditions
+### Optimizations Implemented:
 
-### 5. Performance Optimization
-- **Minimize condition complexity**: Simple conditions evaluate faster
-- **Use efficient patterns**: Avoid overly complex regex patterns
-- **Cache context values**: Reuse resolved attributes
+1. **Regex Caching**: Compiled regex patterns are cached in the enhanced evaluator
+2. **Path Resolution**: Composite resolver tries most efficient strategies first
+3. **Context Validation**: Early validation prevents unnecessary processing
+4. **Configurable Limits**: Maximum condition depth, keys, and evaluation time
 
-### 6. Security Guidelines
-- **Default to deny**: No matching policy = access denied
-- **Use deny-override**: Critical security policies should deny
-- **Validate inputs**: Always validate request parameters
-- **Audit decisions**: Log all access decisions for security monitoring
+### Performance Limits:
 
-## 📈 Monitoring & Metrics
+```go
+const (
+    MaxConditionDepth   = 10    // Maximum nesting depth
+    MaxConditionKeys    = 100   // Maximum condition keys per policy
+    MaxEvaluationTimeMs = 5000  // Maximum evaluation time
+)
+```
 
-### Key Performance Indicators
-- **Evaluation Latency**: P50, P95, P99 response times
-- **Decision Distribution**: PERMIT vs DENY ratios
-- **Policy Coverage**: Percentage of requests matching policies
-- **Error Rate**: Failed evaluations per total requests
+## Testing
 
-### Performance Targets
-- **Latency**: < 5ms per evaluation
-- **Throughput**: > 2000 evaluations/second
-- **Memory Usage**: < 100MB for policy cache
-- **CPU Usage**: < 50% under normal load
+Each package includes comprehensive tests:
 
-Package `evaluator` cung cấp một powerful, flexible, và secure policy evaluation engine cho ABAC system, hỗ trợ cả legacy và modern policy formats với comprehensive pattern matching và condition evaluation capabilities.
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: End-to-end policy evaluation
+- **Performance Tests**: Benchmarking and load testing
+
+Run tests for specific packages:
+
+```bash
+# Test all evaluator components
+go test ./evaluator/...
+
+# Test specific packages
+go test ./evaluator/core
+go test ./evaluator/conditions
+go test ./evaluator/matchers
+go test ./evaluator/path
+```
+
+## Migration from Legacy Evaluator
+
+The legacy `ConditionEvaluator` has been completely removed. All condition evaluation now uses the `EnhancedConditionEvaluator`:
+
+### Breaking Changes:
+- Removed `NewConditionEvaluator()` - use `conditions.NewEnhancedConditionEvaluator()`
+- Removed `evaluateConditionsLegacy()` method
+- Updated package structure requires import path changes
+
+### Migration Steps:
+1. Update imports to use specific subpackages
+2. Replace `NewConditionEvaluator()` with `conditions.NewEnhancedConditionEvaluator()`
+3. Update any direct references to internal methods (now properly encapsulated)
+
+## Error Handling
+
+The evaluator provides detailed error information:
+
+- **Validation Errors**: Policy syntax and structure issues
+- **Evaluation Errors**: Runtime evaluation problems
+- **Context Errors**: Missing or invalid context attributes
+
+## Security Considerations
+
+- **Input Validation**: All inputs are validated before processing
+- **DoS Protection**: Configurable limits prevent resource exhaustion
+- **Secure Defaults**: Deny-by-default policy combining algorithm
+- **Audit Trail**: Comprehensive logging of evaluation decisions
+
+## Future Enhancements
+
+Planned improvements include:
+
+1. **Policy Caching**: Intelligent policy caching for improved performance
+2. **Distributed Evaluation**: Support for distributed policy evaluation
+3. **Policy Optimization**: Automatic policy optimization and conflict detection
+4. **Enhanced Metrics**: Detailed performance and usage metrics
+5. **Policy Templates**: Reusable policy templates and inheritance
+
+## Contributing
+
+When contributing to the evaluator package:
+
+1. Follow the established package structure
+2. Add comprehensive tests for new features
+3. Update documentation for any API changes
+4. Ensure backward compatibility where possible
+5. Follow Go best practices and the project's coding standards
+
+For detailed implementation examples, see the test files in each subpackage.

@@ -1,4 +1,4 @@
-package evaluator
+package core
 
 import (
 	"fmt"
@@ -10,6 +10,8 @@ import (
 
 	"abac_go_example/attributes"
 	"abac_go_example/constants"
+	"abac_go_example/evaluator/conditions"
+	"abac_go_example/evaluator/matchers"
 	"abac_go_example/models"
 	"abac_go_example/storage"
 )
@@ -23,9 +25,9 @@ type PolicyDecisionPointInterface interface {
 type PolicyDecisionPoint struct {
 	storage                    storage.Storage
 	attributeResolver          *attributes.AttributeResolver
-	actionMatcher              *ActionMatcher
-	resourceMatcher            *ResourceMatcher
-	enhancedConditionEvaluator *EnhancedConditionEvaluator
+	actionMatcher              *matchers.ActionMatcher
+	resourceMatcher            *matchers.ResourceMatcher
+	enhancedConditionEvaluator *conditions.EnhancedConditionEvaluator
 }
 
 // NewPolicyDecisionPoint creates a new PDP instance and returns the interface
@@ -33,9 +35,9 @@ func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterfac
 	return &PolicyDecisionPoint{
 		storage:                    storage,
 		attributeResolver:          attributes.NewAttributeResolver(storage),
-		actionMatcher:              NewActionMatcher(),
-		resourceMatcher:            NewResourceMatcher(),
-		enhancedConditionEvaluator: NewEnhancedConditionEvaluator(),
+		actionMatcher:              matchers.NewActionMatcher(),
+		resourceMatcher:            matchers.NewResourceMatcher(),
+		enhancedConditionEvaluator: conditions.NewEnhancedConditionEvaluator(),
 	}
 }
 

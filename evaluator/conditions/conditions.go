@@ -1,4 +1,4 @@
-package evaluator
+package conditions
 
 // ComplexCondition represents a complex condition with logical operators
 // This is kept for backward compatibility with existing policy formats
