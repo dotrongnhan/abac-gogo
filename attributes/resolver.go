@@ -82,7 +82,7 @@ func (r *AttributeResolver) enrichEnvironmentContext(context map[string]interfac
 	}
 
 	// Add derived IP attributes
-	if sourceIP, ok := enriched["source_ip"].(string); ok {
+	if sourceIP, ok := enriched["client_ip"].(string); ok {
 		enriched["is_internal_ip"] = r.isInternalIP(sourceIP)
 		enriched["ip_subnet"] = r.getIPSubnet(sourceIP)
 	}

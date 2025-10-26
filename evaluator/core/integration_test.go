@@ -327,6 +327,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					"level":             5,
 					"is_business_hours": true,
 					"client_ip":         "192.168.1.100",
+					"timestamp":         timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)), // Thursday 14:30
 				},
 			},
 			expectedResult: "permit",
@@ -353,6 +354,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 						"level":        8,
 						"clearance":    "confidential",
 						"mfa_verified": true,
+						"timestamp":    timePtr(time.Date(2024, 10, 24, 10, 0, 0, 0, time.UTC)),
 					},
 				},
 			},
