@@ -16,6 +16,7 @@ func NewActionMatcher() *ActionMatcher {
 // Match checks if an action matches a pattern
 // Pattern format: <service>:<resource-type>:<operation>
 // Supports wildcards: *, prefix-*, *-suffix, *-middle-*
+// Trailing wildcard (*) matches remaining action segments
 func (am *ActionMatcher) Match(pattern, action string) bool {
 	if pattern == "*" {
 		return true
@@ -24,6 +25,22 @@ func (am *ActionMatcher) Match(pattern, action string) bool {
 	patternParts := strings.Split(pattern, ":")
 	actionParts := strings.Split(action, ":")
 
+	// Handle trailing wildcard case
+	if len(patternParts) > 0 && patternParts[len(patternParts)-1] == "*" {
+		// Pattern ends with *, so it can match actions with more segments
+		if len(actionParts) < len(patternParts)-1 {
+			return false
+		}
+		// Match all segments except the trailing wildcard
+		for i := 0; i < len(patternParts)-1; i++ {
+			if !am.matchSegment(patternParts[i], actionParts[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Standard matching: exact number of segments required
 	if len(patternParts) != len(actionParts) {
 		return false
 	}
@@ -205,14 +222,13 @@ func (rm *ResourceMatcher) validateSimpleResourceFormat(resource string) bool {
 		return false
 	}
 
-	// No empty segments (except wildcards)
+	// No empty segments (except wildcards and variables)
 	for _, part := range parts {
 		if part == "" {
 			return false
 		}
-		// Allow variables in format ${...}
-		isVariable := strings.HasPrefix(part, "${") && strings.HasSuffix(part, "}")
-		if isVariable {
+		// Allow variables in format ${...} - skip validation for them
+		if strings.HasPrefix(part, "${") && strings.HasSuffix(part, "}") {
 			continue
 		}
 	}
