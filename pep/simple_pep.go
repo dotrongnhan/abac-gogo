@@ -83,9 +83,10 @@ func (spep *SimplePolicyEnforcementPoint) EnforceRequest(ctx context.Context, re
 
 	// Create enforcement result
 	result := &EnforcementResult{
-		Decision:         decision,
+		Decision:         decision.Result,
 		Allowed:          decision.Result == "permit",
 		Reason:           decision.Reason,
+		MatchedPolicies:  decision.MatchedPolicies,
 		EvaluationTimeMs: int(time.Since(startTime).Milliseconds()),
 		CacheHit:         false,
 		Timestamp:        time.Now(),
@@ -168,14 +169,10 @@ func (spep *SimplePolicyEnforcementPoint) validateRequest(request *models.Evalua
 // createDenyResult creates a deny result for error cases
 func (spep *SimplePolicyEnforcementPoint) createDenyResult(reason string, startTime time.Time) *EnforcementResult {
 	return &EnforcementResult{
-		Decision: &models.Decision{
-			Result:           "deny",
-			MatchedPolicies:  []string{},
-			EvaluationTimeMs: int(time.Since(startTime).Milliseconds()),
-			Reason:           reason,
-		},
+		Decision:         "deny",
 		Allowed:          false,
 		Reason:           reason,
+		MatchedPolicies:  []string{},
 		EvaluationTimeMs: int(time.Since(startTime).Milliseconds()),
 		CacheHit:         false,
 		Timestamp:        time.Now(),
@@ -193,10 +190,10 @@ func (spep *SimplePolicyEnforcementPoint) auditDecision(request *models.Evaluati
 		"subject_id":       request.SubjectID,
 		"resource_id":      request.ResourceID,
 		"action":           request.Action,
-		"decision":         result.Decision.Result,
+		"decision":         result.Decision,
 		"allowed":          result.Allowed,
 		"evaluation_ms":    result.EvaluationTimeMs,
-		"matched_policies": result.Decision.MatchedPolicies,
+		"matched_policies": result.MatchedPolicies,
 		"context":          request.Context,
 	}
 

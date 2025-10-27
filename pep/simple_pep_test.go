@@ -114,8 +114,8 @@ func TestSimplePolicyEnforcementPoint_EnforceRequest(t *testing.T) {
 				t.Fatalf("Result should not be nil")
 			}
 
-			if result.Decision.Result != tt.expectedResult {
-				t.Errorf("Expected result %s, got %s", tt.expectedResult, result.Decision.Result)
+			if result.Decision != tt.expectedResult {
+				t.Errorf("Expected result %s, got %s", tt.expectedResult, result.Decision)
 			}
 
 			// Check that allowed matches the decision
@@ -226,7 +226,7 @@ func TestSimplePolicyEnforcementPoint_Validation(t *testing.T) {
 			}
 
 			// Should deny invalid requests
-			if result == nil || result.Decision.Result != "deny" {
+			if result == nil || result.Decision != "deny" {
 				t.Errorf("Expected deny result for invalid request")
 			}
 		})
@@ -263,7 +263,7 @@ func TestSimplePolicyEnforcementPoint_Timeout(t *testing.T) {
 	}
 
 	// Should deny on timeout
-	if result == nil || result.Decision.Result != "deny" {
+	if result == nil || result.Decision != "deny" {
 		t.Errorf("Expected deny result for timeout")
 	}
 }
