@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/core"
 	"abac_go_example/models"
 	"abac_go_example/storage"
 
@@ -30,7 +30,7 @@ func main() {
 	defer storage.Close()
 
 	// Khởi tạo PDP
-	pdp := evaluator.NewPolicyDecisionPoint(storage)
+	pdp := core.NewPolicyDecisionPoint(storage)
 
 	// Khởi tạo service
 	service := &ABACService{
@@ -115,7 +115,7 @@ func main() {
 
 // ABACService - HTTP service với ABAC authorization
 type ABACService struct {
-	pdp     evaluator.PolicyDecisionPointInterface
+	pdp     core.PolicyDecisionPointInterface
 	storage storage.Storage
 }
 

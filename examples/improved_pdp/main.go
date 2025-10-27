@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/core"
 	"abac_go_example/models"
 	"abac_go_example/storage"
 )
@@ -31,7 +31,7 @@ func main() {
 	defer storage.Close()
 
 	// Create improved PDP
-	pdp := evaluator.NewPolicyDecisionPoint(storage)
+	pdp := core.NewPolicyDecisionPoint(storage)
 
 	// Example 1: Time-based attributes (Improvement #4)
 	fmt.Println("\n=== Example 1: Time-based Attributes ===")
@@ -58,7 +58,7 @@ func main() {
 	preFilteringExample(pdp)
 }
 
-func timeBasedExampleImproved(pdp evaluator.PolicyDecisionPointInterface) {
+func timeBasedExampleImproved(pdp core.PolicyDecisionPointInterface) {
 	// Create request with time-based attributes
 	now := time.Now()
 	request := &models.EvaluationRequest{
@@ -95,7 +95,7 @@ func timeBasedExampleImproved(pdp evaluator.PolicyDecisionPointInterface) {
 	// - environment:is_business_hours
 }
 
-func environmentalContextExample(pdp evaluator.PolicyDecisionPointInterface) {
+func environmentalContextExample(pdp core.PolicyDecisionPointInterface) {
 	// Create request with rich environmental context
 	request := &models.EvaluationRequest{
 		RequestID:  "env-001",
@@ -140,7 +140,7 @@ func environmentalContextExample(pdp evaluator.PolicyDecisionPointInterface) {
 	// - environment:browser
 }
 
-func structuredAttributesExample(pdp evaluator.PolicyDecisionPointInterface) {
+func structuredAttributesExample(pdp core.PolicyDecisionPointInterface) {
 	// Create request that will benefit from structured attributes
 	request := &models.EvaluationRequest{
 		RequestID:  "struct-001",
@@ -169,7 +169,7 @@ func structuredAttributesExample(pdp evaluator.PolicyDecisionPointInterface) {
 	// This allows policies to use dot notation for nested attributes
 }
 
-func enhancedConditionExample(pdp evaluator.PolicyDecisionPointInterface) {
+func enhancedConditionExample(pdp core.PolicyDecisionPointInterface) {
 	// This example shows how enhanced conditions work
 	// The actual policy would be stored in database with enhanced operators
 
@@ -209,7 +209,7 @@ func enhancedConditionExample(pdp evaluator.PolicyDecisionPointInterface) {
 	fmt.Printf("Reason: %s\n", decision.Reason)
 }
 
-func policyFilteringExample(pdp evaluator.PolicyDecisionPointInterface) {
+func policyFilteringExample(pdp core.PolicyDecisionPointInterface) {
 	fmt.Println("Policy Filtering Performance Improvements:")
 	fmt.Println("- Smart pre-filtering reduces policies to evaluate")
 	fmt.Println("- Pattern matching cache for repeated evaluations")
@@ -257,7 +257,7 @@ func policyFilteringExample(pdp evaluator.PolicyDecisionPointInterface) {
 	fmt.Printf("Average per request: %dms\n", totalTime/len(requests))
 }
 
-func preFilteringExample(pdp evaluator.PolicyDecisionPointInterface) {
+func preFilteringExample(pdp core.PolicyDecisionPointInterface) {
 	fmt.Println("Pre-filtering Optimization Benefits:")
 	fmt.Println("- Reduces O(n) policy evaluation to O(k) where k << n")
 	fmt.Println("- Fast action/resource pattern matching")

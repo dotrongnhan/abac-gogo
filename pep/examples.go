@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/core"
 	"abac_go_example/models"
 	"abac_go_example/storage"
 )
@@ -21,7 +21,7 @@ func ExampleWebServer() {
 	defer pgStorage.Close()
 
 	// Initialize PDP
-	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
+	pdp := core.NewPolicyDecisionPoint(pgStorage)
 
 	// Initialize audit logger
 	auditLogger, err := NewSimpleAuditLogger("./audit.log")
@@ -67,7 +67,7 @@ func ExampleServiceIntegration() {
 		panic(fmt.Sprintf("Failed to initialize storage: %v", err))
 	}
 	defer pgStorage.Close()
-	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
+	pdp := core.NewPolicyDecisionPoint(pgStorage)
 	auditLogger, _ := NewSimpleAuditLogger("./audit.log")
 
 	config := &PEPConfig{
@@ -112,7 +112,7 @@ func ExampleDatabaseIntegration() {
 		panic(fmt.Sprintf("Failed to initialize storage: %v", err))
 	}
 	defer pgStorage.Close()
-	pdp := evaluator.NewPolicyDecisionPoint(pgStorage)
+	pdp := core.NewPolicyDecisionPoint(pgStorage)
 	auditLogger, _ := NewSimpleAuditLogger("./audit.log")
 
 	config := &PEPConfig{

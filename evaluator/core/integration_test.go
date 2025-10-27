@@ -212,6 +212,14 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 			},
 		},
 		{
+			ID:         "api:documents:confidential",
+			ResourceID: "api:documents:confidential",
+			Attributes: map[string]interface{}{
+				"type":           "document",
+				"classification": "confidential",
+			},
+		},
+		{
 			ID:         "api:finance:budget-data",
 			ResourceID: "api:finance:budget-data",
 			Attributes: map[string]interface{}{
@@ -327,7 +335,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					"level":             5,
 					"is_business_hours": true,
 					"client_ip":         "192.168.1.100",
-					"timestamp":         timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)), // Thursday 14:30
+					"timestamp":         timePtr(time.Date(2025, 10, 24, 5, 30, 0, 0, time.UTC)), // Thursday 14:30
 				},
 			},
 			expectedResult: "permit",
@@ -338,7 +346,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 			request: &models.EvaluationRequest{
 				RequestID:  "scenario-002",
 				SubjectID:  "senior-001",
-				ResourceID: "api:documents:confidential/financial-report.pdf",
+				ResourceID: "api:documents:confidential",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 10, 0, 0, 0, time.UTC)),
 				Environment: &models.EnvironmentInfo{
@@ -348,13 +356,13 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					DayOfWeek: "Thursday",
 				},
 				Context: map[string]interface{}{
+					"timestamp": timePtr(time.Date(2025, 10, 24, 10, 0, 0, 0, time.UTC)),
 					"attributes": map[string]interface{}{
 						"subject_type": "employee",
 						"department":   "Engineering",
 						"level":        8,
 						"clearance":    "confidential",
 						"mfa_verified": true,
-						"timestamp":    timePtr(time.Date(2024, 10, 24, 10, 0, 0, 0, time.UTC)),
 					},
 				},
 			},
@@ -427,6 +435,8 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					DayOfWeek: "Thursday",
 				},
 				Context: map[string]interface{}{
+					"timestamp": timePtr(time.Date(2024, 10, 24, 22, 0, 0, 0, time.UTC)), // Thursday 22:00
+
 					"attributes": map[string]interface{}{
 						"subject_type": "employee",
 						"department":   "Engineering",

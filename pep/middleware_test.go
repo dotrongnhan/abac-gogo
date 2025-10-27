@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/core"
 	"abac_go_example/storage"
 )
 
@@ -17,7 +17,7 @@ func TestHTTPMiddleware_Handler(t *testing.T) {
 	defer storage.CleanupTestStorage(t, testStorage)
 	storage.SeedTestData(t, testStorage)
 
-	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
+	pdp := core.NewPolicyDecisionPoint(testStorage)
 	auditLogger := NewNoOpAuditLogger()
 	pep := NewSimplePolicyEnforcementPoint(pdp, auditLogger, nil)
 
@@ -294,7 +294,7 @@ func TestRESTfulMiddleware(t *testing.T) {
 	testStorage := storage.NewTestStorage(t)
 	defer storage.CleanupTestStorage(t, testStorage)
 	storage.SeedTestData(t, testStorage)
-	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
+	pdp := core.NewPolicyDecisionPoint(testStorage)
 	auditLogger := NewNoOpAuditLogger()
 	pep := NewSimplePolicyEnforcementPoint(pdp, auditLogger, nil)
 

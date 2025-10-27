@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/core"
 	"abac_go_example/models"
 	"abac_go_example/storage"
 )
@@ -18,7 +18,7 @@ func BenchmarkSingleEvaluation(b *testing.B) {
 	defer storage.CleanupTestStorage(&testing.T{}, testStorage)
 	storage.SeedTestData(&testing.T{}, testStorage)
 
-	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
+	pdp := core.NewPolicyDecisionPoint(testStorage)
 
 	request := &models.EvaluationRequest{
 		RequestID:  "bench-001",

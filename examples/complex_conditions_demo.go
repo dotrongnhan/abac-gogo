@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/conditions"
 )
 
 func main() {
 	fmt.Println("🔥 ABAC Complex Logical Conditions Demo")
 	fmt.Println("=====================================")
 
-	ce := evaluator.NewConditionEvaluator()
+	ce := conditions.NewEnhancedConditionEvaluator()
 
 	// Demo 1: Simple AND condition
 	fmt.Println("\n=== Demo 1: Simple AND Condition ===")
@@ -37,7 +37,7 @@ func main() {
 		},
 	}
 
-	result1 := ce.Evaluate(simpleAndCondition, context1)
+	result1 := ce.EvaluateConditions(simpleAndCondition, context1)
 	fmt.Printf("Condition: (department = 'engineering') AND (level > 5)\n")
 	fmt.Printf("Context: department='engineering', level=7\n")
 	fmt.Printf("Result: %v ✅\n", result1)
@@ -84,7 +84,7 @@ func main() {
 		},
 	}
 
-	result2 := ce.Evaluate(complexCondition, context2)
+	result2 := ce.EvaluateConditions(complexCondition, context2)
 	fmt.Printf("Condition: (department='engineering' OR role='admin') AND level>=5 AND NOT on_probation\n")
 	fmt.Printf("Context: department='security', role='admin', level=6, on_probation=false\n")
 	fmt.Printf("Result: %v ✅\n", result2)
@@ -143,37 +143,32 @@ func main() {
 		},
 	}
 
-	result3 := ce.Evaluate(multiLevelCondition, context3)
+	result3 := ce.EvaluateConditions(multiLevelCondition, context3)
 	fmt.Printf("Condition: (admin AND internal_IP) OR (engineering AND level>7 AND NOT on_probation)\n")
 	fmt.Printf("Context: role='developer', department='engineering', level=8, on_probation=false, IP=external\n")
 	fmt.Printf("Result: %v ✅\n", result3)
 
-	// Demo 4: Using ComplexCondition struct
-	fmt.Println("\n=== Demo 4: Using ComplexCondition Struct ===")
-	structCondition := &evaluator.ComplexCondition{
-		Type:     "logical",
-		Operator: evaluator.ConditionAnd,
-		Left: &evaluator.ComplexCondition{
-			Type:     "simple",
-			Operator: evaluator.ConditionStringEquals,
-			Key:      "user.department",
-			Value:    "finance",
-		},
-		Right: &evaluator.ComplexCondition{
-			Type:     "logical",
-			Operator: evaluator.ConditionOr,
-			Conditions: []evaluator.ComplexCondition{
-				{
-					Type:     "simple",
-					Operator: evaluator.ConditionNumericGreaterThanEquals,
-					Key:      "user.level",
-					Value:    5,
+	// Demo 4: Using map-based condition structure
+	fmt.Println("\n=== Demo 4: Using Map-based Condition Structure ===")
+	structCondition := map[string]interface{}{
+		"And": []interface{}{
+			map[string]interface{}{
+				"StringEquals": map[string]interface{}{
+					"user.department": "finance",
 				},
-				{
-					Type:     "simple",
-					Operator: evaluator.ConditionStringEquals,
-					Key:      "user.role",
-					Value:    "manager",
+			},
+			map[string]interface{}{
+				"Or": []interface{}{
+					map[string]interface{}{
+						"NumericGreaterThanEquals": map[string]interface{}{
+							"user.level": 5,
+						},
+					},
+					map[string]interface{}{
+						"StringEquals": map[string]interface{}{
+							"user.role": "manager",
+						},
+					},
 				},
 			},
 		},
@@ -187,7 +182,7 @@ func main() {
 		},
 	}
 
-	result4 := ce.EvaluateComplex(structCondition, context4)
+	result4 := ce.EvaluateConditions(structCondition, context4)
 	fmt.Printf("Condition: department='finance' AND (level>=5 OR role='manager')\n")
 	fmt.Printf("Context: department='finance', level=3, role='manager'\n")
 	fmt.Printf("Result: %v ✅\n", result4)
@@ -266,7 +261,7 @@ func main() {
 		},
 	}
 
-	result5 := ce.Evaluate(substitutedCondition, context5)
+	result5 := ce.EvaluateConditions(substitutedCondition, context5)
 	fmt.Printf("Condition: owner OR (same_department AND level>=5) OR (admin AND NOT top_secret)\n")
 	fmt.Printf("Context: not_owner, same_department, level=6, not_admin, not_top_secret\n")
 	fmt.Printf("Result: %v ✅ (Access granted via department rule)\n", result5)
@@ -278,14 +273,14 @@ func main() {
 	emptyAnd := map[string]interface{}{
 		"And": []interface{}{},
 	}
-	resultEmptyAnd := ce.Evaluate(emptyAnd, map[string]interface{}{})
+	resultEmptyAnd := ce.EvaluateConditions(emptyAnd, map[string]interface{}{})
 	fmt.Printf("Empty AND: %v (should be true)\n", resultEmptyAnd)
 
 	// Empty OR
 	emptyOr := map[string]interface{}{
 		"Or": []interface{}{},
 	}
-	resultEmptyOr := ce.Evaluate(emptyOr, map[string]interface{}{})
+	resultEmptyOr := ce.EvaluateConditions(emptyOr, map[string]interface{}{})
 	fmt.Printf("Empty OR: %v (should be false)\n", resultEmptyOr)
 
 	fmt.Println("\n🎉 Demo completed! Complex logical conditions are working perfectly!")

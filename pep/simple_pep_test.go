@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/core"
 	"abac_go_example/models"
 	"abac_go_example/storage"
 )
@@ -16,7 +16,7 @@ func TestSimplePolicyEnforcementPoint_EnforceRequest(t *testing.T) {
 	defer storage.CleanupTestStorage(t, testStorage)
 	storage.SeedTestData(t, testStorage)
 
-	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
+	pdp := core.NewPolicyDecisionPoint(testStorage)
 	auditLogger := NewNoOpAuditLogger()
 
 	config := &PEPConfig{
@@ -131,7 +131,7 @@ func TestSimplePolicyEnforcementPoint_Metrics(t *testing.T) {
 	testStorage := storage.NewTestStorage(t)
 	defer storage.CleanupTestStorage(t, testStorage)
 	storage.SeedTestData(t, testStorage)
-	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
+	pdp := core.NewPolicyDecisionPoint(testStorage)
 	auditLogger := NewNoOpAuditLogger()
 
 	pep := NewSimplePolicyEnforcementPoint(pdp, auditLogger, nil)
@@ -171,7 +171,7 @@ func TestSimplePolicyEnforcementPoint_Validation(t *testing.T) {
 	testStorage := storage.NewTestStorage(t)
 	defer storage.CleanupTestStorage(t, testStorage)
 	storage.SeedTestData(t, testStorage)
-	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
+	pdp := core.NewPolicyDecisionPoint(testStorage)
 	auditLogger := NewNoOpAuditLogger()
 
 	config := &PEPConfig{
@@ -237,7 +237,7 @@ func TestSimplePolicyEnforcementPoint_Timeout(t *testing.T) {
 	testStorage := storage.NewTestStorage(t)
 	defer storage.CleanupTestStorage(t, testStorage)
 	storage.SeedTestData(t, testStorage)
-	pdp := evaluator.NewPolicyDecisionPoint(testStorage)
+	pdp := core.NewPolicyDecisionPoint(testStorage)
 	auditLogger := NewNoOpAuditLogger()
 
 	config := &PEPConfig{

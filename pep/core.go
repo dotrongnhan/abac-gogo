@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"abac_go_example/evaluator"
+	"abac_go_example/evaluator/core"
 	"abac_go_example/models"
 )
 
 // PolicyEnforcementPoint (PEP) is the main enforcement engine
 type PolicyEnforcementPoint struct {
-	pdp            *evaluator.PolicyDecisionPoint
+	pdp            *core.PolicyDecisionPoint
 	auditLogger    AuditLogger
 	cache          *DecisionCache
 	config         *PEPConfig
@@ -68,7 +68,7 @@ func DefaultPEPConfig() *PEPConfig {
 }
 
 // NewPolicyEnforcementPoint creates a new PEP instance
-func NewPolicyEnforcementPoint(pdp *evaluator.PolicyDecisionPoint, auditLogger AuditLogger, config *PEPConfig) *PolicyEnforcementPoint {
+func NewPolicyEnforcementPoint(pdp *core.PolicyDecisionPoint, auditLogger AuditLogger, config *PEPConfig) *PolicyEnforcementPoint {
 	if config == nil {
 		config = DefaultPEPConfig()
 	}
