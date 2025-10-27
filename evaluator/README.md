@@ -1,6 +1,8 @@
 # ABAC Evaluator Package
 
-Package evaluator cung cấp hệ thống đánh giá policy ABAC (Attribute-Based Access Control) toàn diện. Package này đã được tái cấu trúc để sử dụng kiến trúc modular sạch với enhanced condition evaluator làm engine đánh giá chính.
+Package evaluator cung cấp hệ thống đánh giá policy ABAC (Attribute-Based Access Control) toàn diện. Package này sử dụng kiến trúc modular với `evaluator/core` làm engine đánh giá chính và enhanced condition evaluator để xử lý complex logical expressions.
+
+**⚠️ Lưu ý quan trọng**: Package này chỉ là documentation wrapper. Tất cả implementations thực tế nằm trong các subpackages. Sử dụng trực tiếp các subpackages để có type safety và clarity tốt hơn.
 
 ## Tổng quan Kiến trúc
 
@@ -17,19 +19,21 @@ evaluator/
 
 ## Cấu trúc Package
 
-### Core Package (`evaluator/core`)
+### Core Package (`evaluator/core`) - **ENGINE CHÍNH**
 
-Chứa Policy Decision Point (PDP) chính và các component validation policy:
+Đây là package chính chứa Policy Decision Point (PDP) và tất cả logic đánh giá policy:
 
-- **PolicyDecisionPoint**: Engine đánh giá chính thực hiện deny-override algorithm
-- **PolicyValidator**: Validate cú pháp và cấu trúc policy
-- **Integration tests**: Testing toàn diện từ đầu đến cuối
+- **PolicyDecisionPoint**: Engine đánh giá chính thực hiện AWS IAM-style deny-override algorithm
+- **PolicyDecisionPointInterface**: Interface chuẩn cho policy evaluation
+- **Enhanced Context Building**: Tự động enriches evaluation context với time-based và environmental attributes
+- **Integration tests**: Testing toàn diện end-to-end với mock storage
 
 #### Tính năng chính:
-- Deny-override policy combining algorithm
-- Enhanced context building với time-based và environmental attributes
-- Xử lý structured subject và resource attribute
-- Performance optimizations với configurable limits
+- **Deny-Override Algorithm**: Nếu có bất kỳ policy nào deny, kết quả là deny ngay lập tức
+- **Enhanced Context Building**: Tự động thêm time-based attributes (business hours, weekend, etc.)
+- **Environmental Context**: IP detection, user agent parsing, location attributes
+- **Structured Attributes**: Hỗ trợ cả flat (`user:department`) và nested (`user.department`) access
+- **Performance Optimized**: Input validation, configurable limits, evaluation timeouts
 
 ### Conditions Package (`evaluator/conditions`)
 
@@ -90,13 +94,13 @@ Cung cấp flexible attribute path resolution:
 - **DotNotationResolver**: Xử lý nested object access (`user.department`)
 - **PathNormalizer**: Normalize và validate attribute paths
 
-## Ví dụ Sử dụng
+## ✅ Ví dụ Sử dụng Hiện tại
 
-### Đánh giá Policy Cơ bản
+### 1. Đánh giá Policy Cơ bản (Main Application Pattern)
 
 ```go
 import (
-    "abac_go_example/evaluator/core"
+    "abac_go_example/evaluator/core"  // ✅ Sử dụng core package
     "abac_go_example/storage"
 )
 
@@ -106,7 +110,7 @@ pdp := core.NewPolicyDecisionPoint(storage)
 // Create evaluation request
 request := &models.EvaluationRequest{
     SubjectID:  "user-123",
-    ResourceID: "api:documents:doc-456",
+    ResourceID: "api:documents:doc-456", 
     Action:     "document-service:file:read",
     Context: map[string]interface{}{
         "department": "engineering",
@@ -122,11 +126,38 @@ if err != nil {
 fmt.Printf("Decision: %s, Reason: %s\n", decision.Result, decision.Reason)
 ```
 
-### Đánh giá Condition Nâng cao
+### 2. PEP Integration Pattern
+
+```go
+import "abac_go_example/evaluator/core"
+
+// Trong PEP service
+type ABACService struct {
+    pdp     core.PolicyDecisionPointInterface  // ✅ Sử dụng core interface
+    storage storage.Storage
+}
+
+// PEP middleware sử dụng core PDP
+func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        request := &models.EvaluationRequest{
+            SubjectID:  c.GetHeader("X-Subject-ID"),
+            ResourceID: c.Request.URL.Path,
+            Action:     requiredAction,
+        }
+        
+        decision, err := service.pdp.Evaluate(request)
+        // ... handle decision
+    }
+}
+```
+
+### 3. Đánh giá Condition Nâng cao (Enhanced Evaluator Pattern)
 
 ```go
 import "abac_go_example/evaluator/conditions"
 
+// ✅ Sử dụng enhanced condition evaluator
 evaluator := conditions.NewEnhancedConditionEvaluator()
 
 conditions := map[string]interface{}{
@@ -159,6 +190,7 @@ context := map[string]interface{}{
     },
 }
 
+// ✅ Sử dụng EvaluateConditions method
 result := evaluator.EvaluateConditions(conditions, context)
 ```
 
@@ -228,19 +260,48 @@ go test ./evaluator/matchers
 go test ./evaluator/path
 ```
 
-## Migration từ Legacy Evaluator
+## ✅ Migration Hoàn thành - Sử dụng `evaluator/core`
 
-Legacy `ConditionEvaluator` đã được loại bỏ hoàn toàn. Tất cả condition evaluation hiện sử dụng `EnhancedConditionEvaluator`:
+**Tất cả code đã được migrate sang sử dụng `evaluator/core` package.**
 
-### Breaking Changes:
-- Đã xóa `NewConditionEvaluator()` - sử dụng `conditions.NewEnhancedConditionEvaluator()`
-- Đã xóa `evaluateConditionsLegacy()` method
-- Cấu trúc package đã cập nhật yêu cầu thay đổi import path
+### ✅ Những gì đã thay đổi:
+- **Đã xóa**: `evaluator/pdp.go` (file duplicate)
+- **Sử dụng**: `evaluator/core` làm package chính
+- **Cập nhật**: Tất cả imports trong main.go, examples, PEP, và tests
 
-### Các bước Migration:
-1. Cập nhật imports để sử dụng specific subpackages
-2. Thay thế `NewConditionEvaluator()` bằng `conditions.NewEnhancedConditionEvaluator()`
-3. Cập nhật bất kỳ direct references nào đến internal methods (hiện đã properly encapsulated)
+### ✅ Import Pattern mới:
+```go
+// ✅ ĐÚNG - Sử dụng core package
+import "abac_go_example/evaluator/core"
+pdp := core.NewPolicyDecisionPoint(storage)
+
+// ❌ SAI - Không còn tồn tại
+import "abac_go_example/evaluator"
+pdp := evaluator.NewPolicyDecisionPoint(storage)
+```
+
+### ✅ Files đã được cập nhật:
+- `main.go` - Main application
+- `examples/improved_pdp/main.go` - Example application  
+- `examples/complex_conditions_demo.go` - Condition demo (cập nhật để sử dụng enhanced evaluator)
+- `pep/core.go`, `pep/simple_pep.go`, `pep/examples.go` - Tất cả PEP components
+- `pep/simple_pep_test.go`, `pep/middleware_test.go` - Tất cả tests
+- `benchmark_test.go` - Benchmark tests
+
+### ✅ Verification:
+```bash
+# Tất cả builds thành công
+go build -o test_main ./main.go                    ✅
+go build -o test_example ./examples/improved_pdp/  ✅  
+go build -o test_demo ./examples/complex_conditions_demo.go ✅
+
+# Tất cả tests pass
+go test ./pep/... -v                              ✅
+go test ./evaluator/core -v                       ✅
+
+# Không có linter errors
+golangci-lint run                                  ✅
+```
 
 ## Error Handling
 
@@ -257,10 +318,16 @@ Evaluator cung cấp thông tin error chi tiết:
 - **Secure Defaults**: Deny-by-default policy combining algorithm
 - **Audit Trail**: Comprehensive logging của evaluation decisions
 
-## Cải tiến Tương lai
+## ✅ Tình trạng hiện tại
 
-Các cải tiến được lên kế hoạch bao gồm:
+### ✅ Đã hoàn thành:
+- **Clean Architecture**: Package structure rõ ràng với separation of concerns
+- **Enhanced Condition Evaluation**: Hỗ trợ đầy đủ logical operators và data types
+- **Performance Optimization**: Regex caching, input validation, configurable limits
+- **Comprehensive Testing**: Unit tests, integration tests, benchmarks
+- **Migration Complete**: Tất cả code sử dụng `evaluator/core` consistently
 
+### 🚀 Cải tiến Tương lai:
 1. **Policy Caching**: Intelligent policy caching để cải thiện performance
 2. **Distributed Evaluation**: Hỗ trợ distributed policy evaluation
 3. **Policy Optimization**: Automatic policy optimization và conflict detection
