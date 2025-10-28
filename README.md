@@ -27,7 +27,16 @@ abac_go_example/
 ├── models/                     # Data models with GORM tags
 ├── evaluator/                  # Policy Decision Point (PDP)
 │   ├── core/                   # Main PDP engine and validation
-│   ├── conditions/             # Advanced condition evaluators
+│   ├── conditions/             # Modular condition evaluators (REFACTORED)
+│   │   ├── enhanced_condition_evaluator.go  # Main orchestrator
+│   │   ├── string_evaluator.go             # String operations
+│   │   ├── numeric_evaluator.go            # Numeric operations
+│   │   ├── time_evaluator.go               # Time/Date operations
+│   │   ├── array_evaluator.go              # Array operations
+│   │   ├── network_evaluator.go            # Network operations
+│   │   ├── logical_evaluator.go            # AND/OR/NOT logic
+│   │   ├── base_evaluator.go               # Common functionality
+│   │   └── interfaces.go                   # Type definitions
 │   ├── matchers/               # Action/resource pattern matching
 │   └── path/                   # Attribute path resolution
 ├── attributes/                 # Policy Information Point (PIP)
@@ -38,7 +47,12 @@ abac_go_example/
 ├── pep/                        # Policy Enforcement Point
 ├── operators/                  # Comparison operators
 ├── audit/                      # Audit logging system
-├── constants/                  # System constants and enums
+├── constants/                  # System constants and enums (ENHANCED)
+│   ├── business_rules.go       # Business logic constants
+│   ├── condition_operators.go  # Legacy operator constants
+│   ├── context_keys.go         # Context key definitions
+│   ├── policy_constants.go     # Policy-related constants
+│   └── evaluator_constants.go  # NEW: All evaluator constants
 └── docs/                       # Documentation
 ```
 
@@ -430,10 +444,44 @@ func (s *SecureService) GetUser(ctx context.Context, subjectID, userID string) e
 4. Test with appropriate subject IDs
 
 ### Adding New Operators
-1. Implement operator in `evaluator/conditions/enhanced_condition_evaluator.go`
+
+#### Modern Approach (Recommended)
+1. **Add constant** in `constants/evaluator_constants.go`
+2. **Choose appropriate evaluator**:
+   - String operations → `string_evaluator.go`
+   - Numeric operations → `numeric_evaluator.go`
+   - Time operations → `time_evaluator.go`
+   - Array operations → `array_evaluator.go`
+   - Network operations → `network_evaluator.go`
+   - Logical operations → `logical_evaluator.go`
+3. **Implement method** in chosen evaluator
+4. **Register operator** in `enhanced_condition_evaluator.go`
+5. **Add comprehensive tests** for the specific evaluator
+6. **Update documentation** and interfaces
+
+#### Legacy Approach (Deprecated)
+1. ~~Implement operator in monolithic file~~ (No longer recommended)
 2. Add operator constant in `constants/condition_operators.go`
 3. Add comprehensive tests
 4. Update documentation
+
+#### Example: Adding Custom String Operator
+```go
+// 1. Add constant
+const OpStringCustomMatch = "stringcustommatch"
+
+// 2. Implement in string_evaluator.go
+func (se *StringConditionEvaluator) EvaluateCustomMatch(conditions interface{}, context map[string]interface{}) bool {
+    return se.EvaluateWithConditionMap(conditions, context, func(evalCtx EvaluationContext) bool {
+        // Custom logic here
+        return true
+    })
+}
+
+// 3. Register in enhanced_condition_evaluator.go
+case constants.OpStringCustomMatch:
+    return ece.stringEvaluator.EvaluateCustomMatch(operatorConditions, context)
+```
 
 ### Policy Management
 - Policies stored in PostgreSQL `policies` table
