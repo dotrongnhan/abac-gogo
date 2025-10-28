@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"abac_go_example/evaluator/path"
+	"abac_go_example/operators"
 )
 
 // EnhancedConditionEvaluator provides advanced condition evaluation capabilities
@@ -17,6 +18,8 @@ type EnhancedConditionEvaluator struct {
 	regexCache map[string]*regexp.Regexp
 	// Path resolver for attribute access
 	pathResolver path.PathResolver
+	// Network utilities for IP and user agent processing
+	networkUtils *operators.NetworkUtils
 }
 
 // NewEnhancedConditionEvaluator creates a new enhanced condition evaluator
@@ -24,6 +27,7 @@ func NewEnhancedConditionEvaluator() *EnhancedConditionEvaluator {
 	return &EnhancedConditionEvaluator{
 		regexCache:   make(map[string]*regexp.Regexp),
 		pathResolver: path.NewCompositePathResolver(),
+		networkUtils: operators.NewNetworkUtils(),
 	}
 }
 
@@ -571,12 +575,12 @@ func (ece *EnhancedConditionEvaluator) evaluateIsBusinessHours(conditions interf
 		actualValue := ece.getValueFromContext(attributePath, context)
 		expectedBool := ece.toBool(expected)
 
-		// Check if current time is business hours (9 AM - 5 PM, Monday-Friday)
+		// Check if current time is business hours using constants
 		var isBusinessHours bool
 		if timeValue, ok := actualValue.(time.Time); ok {
 			hour := timeValue.Hour()
-			weekday := timeValue.Weekday()
-			isBusinessHours = hour >= 9 && hour < 17 && weekday >= time.Monday && weekday <= time.Friday
+			weekday := int(timeValue.Weekday())
+			isBusinessHours = ece.networkUtils.IsBusinessHours(hour, weekday)
 		} else if boolValue, ok := actualValue.(bool); ok {
 			// If the value is already a boolean, use it directly
 			isBusinessHours = boolValue
@@ -588,8 +592,27 @@ func (ece *EnhancedConditionEvaluator) evaluateIsBusinessHours(conditions interf
 			hour := int(ece.toFloat64(hourValue))
 			dayStr := ece.toString(dayValue)
 
-			isWeekday := !strings.EqualFold(dayStr, "Saturday") && !strings.EqualFold(dayStr, "Sunday")
-			isBusinessHours = hour >= 9 && hour < 17 && isWeekday
+			// Convert day string to weekday number for consistency
+			var weekday int
+			switch strings.ToLower(dayStr) {
+			case "sunday":
+				weekday = 0
+			case "monday":
+				weekday = 1
+			case "tuesday":
+				weekday = 2
+			case "wednesday":
+				weekday = 3
+			case "thursday":
+				weekday = 4
+			case "friday":
+				weekday = 5
+			case "saturday":
+				weekday = 6
+			default:
+				weekday = -1 // Invalid day
+			}
+			isBusinessHours = ece.networkUtils.IsBusinessHours(hour, weekday)
 		}
 
 		if isBusinessHours != expectedBool {
@@ -671,7 +694,7 @@ func (ece *EnhancedConditionEvaluator) evaluateIsInternalIP(conditions interface
 			if ip == nil {
 				return false
 			}
-			isInternal = ece.isInternalIP(ip)
+			isInternal = ece.networkUtils.IsInternalIPAddress(ip)
 		}
 
 		if isInternal != expectedBool {
@@ -913,23 +936,4 @@ func (ece *EnhancedConditionEvaluator) parseTime(value interface{}) time.Time {
 	return time.Time{}
 }
 
-func (ece *EnhancedConditionEvaluator) isInternalIP(ip net.IP) bool {
-	privateRanges := []string{
-		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
-		"127.0.0.0/8",
-	}
-
-	for _, rangeStr := range privateRanges {
-		_, cidr, err := net.ParseCIDR(rangeStr)
-		if err != nil {
-			continue
-		}
-		if cidr.Contains(ip) {
-			return true
-		}
-	}
-
-	return false
-}
+// isInternalIP method removed - now using networkUtils.IsInternalIPAddress

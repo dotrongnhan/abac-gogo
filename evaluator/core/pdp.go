@@ -3,8 +3,6 @@ package core
 import (
 	"fmt"
 	"log"
-	"net"
-	"regexp"
 	"strings"
 	"time"
 
@@ -13,6 +11,7 @@ import (
 	"abac_go_example/evaluator/conditions"
 	"abac_go_example/evaluator/matchers"
 	"abac_go_example/models"
+	"abac_go_example/operators"
 	"abac_go_example/storage"
 )
 
@@ -28,6 +27,7 @@ type PolicyDecisionPoint struct {
 	actionMatcher              *matchers.ActionMatcher
 	resourceMatcher            *matchers.ResourceMatcher
 	enhancedConditionEvaluator *conditions.EnhancedConditionEvaluator
+	networkUtils               *operators.NetworkUtils
 }
 
 // NewPolicyDecisionPoint creates a new PDP instance and returns the interface
@@ -38,6 +38,7 @@ func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterfac
 		actionMatcher:              matchers.NewActionMatcher(),
 		resourceMatcher:            matchers.NewResourceMatcher(),
 		enhancedConditionEvaluator: conditions.NewEnhancedConditionEvaluator(),
+		networkUtils:               operators.NewNetworkUtils(),
 	}
 }
 
@@ -81,7 +82,7 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 
 // BuildEnhancedEvaluationContext builds enhanced context map with structured attributes
 func (pdp *PolicyDecisionPoint) BuildEnhancedEvaluationContext(request *models.EvaluationRequest, context *models.EvaluationContext) map[string]interface{} {
-	evalContext := make(map[string]interface{}, 50)
+	evalContext := make(map[string]interface{}, constants.DefaultContextMapSize)
 
 	// Request context
 	evalContext[constants.ContextKeyRequestUserID] = request.SubjectID
@@ -137,7 +138,7 @@ func (pdp *PolicyDecisionPoint) addTimeBasedAttributes(evalContext map[string]in
 	evalContext[constants.ContextKeyEnvironmentPrefix+"hour"] = timestamp.Hour()
 	evalContext[constants.ContextKeyEnvironmentPrefix+"minute"] = timestamp.Minute()
 	evalContext[constants.ContextKeyEnvironmentPrefix+"is_weekend"] = timestamp.Weekday() == time.Saturday || timestamp.Weekday() == time.Sunday
-	evalContext[constants.ContextKeyEnvironmentPrefix+"is_business_hours"] = timestamp.Hour() >= 9 && timestamp.Hour() < 17
+	evalContext[constants.ContextKeyEnvironmentPrefix+"is_business_hours"] = pdp.networkUtils.IsBusinessHours(timestamp.Hour(), int(timestamp.Weekday()))
 }
 
 // addEnvironmentalContext adds environmental context (improvement #5)
@@ -151,15 +152,15 @@ func (pdp *PolicyDecisionPoint) addEnvironmentalContext(evalContext map[string]i
 	// Client IP and related attributes
 	if env.ClientIP != "" {
 		evalContext[constants.ContextKeyClientIP] = env.ClientIP
-		evalContext[constants.ContextKeyEnvironmentPrefix+"is_internal_ip"] = pdp.isInternalIP(env.ClientIP)
-		evalContext[constants.ContextKeyEnvironmentPrefix+"ip_class"] = pdp.getIPClass(env.ClientIP)
+		evalContext[constants.ContextKeyEnvironmentPrefix+"is_internal_ip"] = pdp.networkUtils.IsInternalIP(env.ClientIP)
+		evalContext[constants.ContextKeyEnvironmentPrefix+"ip_class"] = pdp.networkUtils.GetIPClass(env.ClientIP)
 	}
 
 	// User Agent and device detection
 	if env.UserAgent != "" {
 		evalContext[constants.ContextKeyUserAgent] = env.UserAgent
-		evalContext[constants.ContextKeyEnvironmentPrefix+"is_mobile"] = pdp.isMobileUserAgent(env.UserAgent)
-		evalContext[constants.ContextKeyEnvironmentPrefix+"browser"] = pdp.getBrowserFromUserAgent(env.UserAgent)
+		evalContext[constants.ContextKeyEnvironmentPrefix+"is_mobile"] = pdp.networkUtils.IsMobileUserAgent(env.UserAgent)
+		evalContext[constants.ContextKeyEnvironmentPrefix+"browser"] = pdp.networkUtils.GetBrowserFromUserAgent(env.UserAgent)
 	}
 
 	// Location attributes
@@ -425,85 +426,4 @@ func (pdp *PolicyDecisionPoint) areConditionsSatisfied(conditions map[string]int
 }
 
 // Helper methods for environmental context processing
-
-// isInternalIP checks if an IP address is internal/private
-func (pdp *PolicyDecisionPoint) isInternalIP(ipStr string) bool {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return false
-	}
-
-	// Check for private IP ranges
-	privateRanges := []string{
-		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
-		"127.0.0.0/8",
-	}
-
-	for _, rangeStr := range privateRanges {
-		_, cidr, err := net.ParseCIDR(rangeStr)
-		if err != nil {
-			continue
-		}
-		if cidr.Contains(ip) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// getIPClass returns the class of IP address
-func (pdp *PolicyDecisionPoint) getIPClass(ipStr string) string {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return "invalid"
-	}
-
-	if ip.To4() != nil {
-		return "ipv4"
-	}
-	return "ipv6"
-}
-
-// isMobileUserAgent detects if user agent is from mobile device
-func (pdp *PolicyDecisionPoint) isMobileUserAgent(userAgent string) bool {
-	mobilePatterns := []string{
-		"(?i)mobile",
-		"(?i)android",
-		"(?i)iphone",
-		"(?i)ipad",
-		"(?i)blackberry",
-		"(?i)windows phone",
-	}
-
-	for _, pattern := range mobilePatterns {
-		matched, _ := regexp.MatchString(pattern, userAgent)
-		if matched {
-			return true
-		}
-	}
-
-	return false
-}
-
-// getBrowserFromUserAgent extracts browser name from user agent
-func (pdp *PolicyDecisionPoint) getBrowserFromUserAgent(userAgent string) string {
-	browserPatterns := map[string]string{
-		"(?i)chrome":  "chrome",
-		"(?i)firefox": "firefox",
-		"(?i)safari":  "safari",
-		"(?i)edge":    "edge",
-		"(?i)opera":   "opera",
-	}
-
-	for pattern, browser := range browserPatterns {
-		matched, _ := regexp.MatchString(pattern, userAgent)
-		if matched {
-			return browser
-		}
-	}
-
-	return "unknown"
-}
+// Note: Network-related helper methods have been moved to operators.NetworkUtils
