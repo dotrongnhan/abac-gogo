@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"abac_go_example/constants"
 	"abac_go_example/models"
 )
 
@@ -22,20 +23,20 @@ type ExpressionEvaluator struct {
 func NewExpressionEvaluator() *ExpressionEvaluator {
 	return &ExpressionEvaluator{
 		operators: map[string]OperatorFunc{
-			"eq":       equals,
-			"ne":       notEquals,
-			"gt":       greaterThan,
-			"gte":      greaterThanEqual,
-			"lt":       lessThan,
-			"lte":      lessThanEqual,
-			"in":       inArray,
-			"nin":      notInArray,
-			"contains": containsValue,
-			"regex":    regexMatch,
-			"and":      andOperator,
-			"or":       orOperator,
-			"not":      notOperator,
-			"exists":   existsOperator,
+			constants.SizeOpEquals:            equals,
+			"ne":                              notEquals,
+			constants.SizeOpGreaterThan:       greaterThan,
+			constants.SizeOpGreaterThanEquals: greaterThanEqual,
+			constants.SizeOpLessThan:          lessThan,
+			constants.SizeOpLessThanEquals:    lessThanEqual,
+			"in":                              inArray,
+			"nin":                             notInArray,
+			"contains":                        containsValue,
+			"regex":                           regexMatch,
+			"and":                             andOperator,
+			"or":                              orOperator,
+			"not":                             notOperator,
+			"exists":                          existsOperator,
 		},
 	}
 }
@@ -283,7 +284,7 @@ func toBool(value interface{}) bool {
 	case bool:
 		return v
 	case string:
-		return strings.ToLower(v) == "true"
+		return strings.ToLower(v) == constants.BoolStringTrue
 	case int:
 		return v != 0
 	case int64:
