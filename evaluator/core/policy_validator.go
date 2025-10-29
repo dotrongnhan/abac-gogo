@@ -150,10 +150,13 @@ func (pv *PolicyValidator) validateStatements(statements []models.PolicyStatemen
 
 // validateActionResource validates action or resource fields
 func (pv *PolicyValidator) validateActionResource(ar models.JSONActionResource, fieldName string, result *ValidationResult) {
-	if ar.IsArray {
-		if len(ar.Multiple) == 0 {
-			pv.addError(result, fieldName, "array cannot be empty", ar.Multiple)
-		}
+	if ar.Single == "" && len(ar.Multiple) == 0 {
+		pv.addError(result, fieldName, "field cannot be empty", ar)
+		return
+	}
+
+	// Validate array values if present
+	if len(ar.Multiple) > 0 {
 		for i, value := range ar.Multiple {
 			if value == "" {
 				pv.addError(result, fmt.Sprintf("%s[%d]", fieldName, i), "value cannot be empty", value)

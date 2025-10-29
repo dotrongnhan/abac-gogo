@@ -205,12 +205,10 @@ func SeedTestData(t *testing.T, storage *PostgreSQLStorage) {
 					Sid:    "EngineeringReadAccess",
 					Effect: "Allow",
 					Action: models.JSONActionResource{
-						Single:  "document-service:file:read",
-						IsArray: false,
+						Single: "document-service:file:read",
 					},
 					Resource: models.JSONActionResource{
-						Single:  "api:documents:dept:engineering/*",
-						IsArray: false,
+						Single: "api:documents:dept:engineering/*",
 					},
 					Condition: models.JSONMap{
 						"StringEquals": map[string]interface{}{
@@ -233,11 +231,9 @@ func SeedTestData(t *testing.T, storage *PostgreSQLStorage) {
 					Effect: "Deny",
 					Action: models.JSONActionResource{
 						Multiple: []string{"document-service:file:write", "document-service:file:delete"},
-						IsArray:  true,
 					},
 					Resource: models.JSONActionResource{
-						Single:  "*",
-						IsArray: false,
+						Single: "*",
 					},
 					Condition: models.JSONMap{
 						"Bool": map[string]interface{}{

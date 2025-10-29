@@ -57,12 +57,10 @@ func TestPolicyValidation(t *testing.T) {
 				Sid:    "TestStatement",
 				Effect: "Allow",
 				Action: JSONActionResource{
-					Single:  "document-service:file:read",
-					IsArray: false,
+					Single: "document-service:file:read",
 				},
 				Resource: JSONActionResource{
-					Single:  "api:documents:*",
-					IsArray: false,
+					Single: "api:documents:*",
 				},
 				Condition: JSONMap{
 					"StringEquals": map[string]interface{}{

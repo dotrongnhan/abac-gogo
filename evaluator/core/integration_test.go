@@ -28,11 +28,9 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					Effect: "Allow",
 					Action: models.JSONActionResource{
 						Multiple: []string{"document:read", "document:list"},
-						IsArray:  true,
 					},
 					Resource: models.JSONActionResource{
-						Single:  "api:documents:*",
-						IsArray: false,
+						Single: "api:documents:*",
 					},
 					Condition: map[string]interface{}{
 						"StringEquals": map[string]interface{}{
@@ -62,12 +60,10 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					Sid:    "ConfidentialDocumentAccess",
 					Effect: "Allow",
 					Action: models.JSONActionResource{
-						Single:  "document:read",
-						IsArray: false,
+						Single: "document:read",
 					},
 					Resource: models.JSONActionResource{
-						Single:  "api:documents:confidential/*",
-						IsArray: false,
+						Single: "api:documents:confidential/*",
 					},
 					Condition: map[string]interface{}{
 						"StringEquals": map[string]interface{}{
@@ -95,11 +91,9 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					Effect: "Deny",
 					Action: models.JSONActionResource{
 						Multiple: []string{"document:write", "document:delete", "admin:*"},
-						IsArray:  true,
 					},
 					Resource: models.JSONActionResource{
-						Single:  "*",
-						IsArray: false,
+						Single: "*",
 					},
 					Condition: map[string]interface{}{
 						"DayOfWeek": map[string]interface{}{
@@ -121,11 +115,9 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					Effect: "Deny",
 					Action: models.JSONActionResource{
 						Multiple: []string{"admin:*", "finance:*"},
-						IsArray:  true,
 					},
 					Resource: models.JSONActionResource{
-						Single:  "*",
-						IsArray: false,
+						Single: "*",
 					},
 					Condition: map[string]interface{}{
 						"Bool": map[string]interface{}{
@@ -497,12 +489,10 @@ func TestImprovedPDP_PerformanceComparison(t *testing.T) {
 					Sid:    fmt.Sprintf("PerfStatement-%d", i),
 					Effect: "Allow",
 					Action: models.JSONActionResource{
-						Single:  fmt.Sprintf("service-%d:action:*", i%5),
-						IsArray: false,
+						Single: fmt.Sprintf("service-%d:action:*", i%5),
 					},
 					Resource: models.JSONActionResource{
-						Single:  fmt.Sprintf("api:resource-%d:*", i%10),
-						IsArray: false,
+						Single: fmt.Sprintf("api:resource-%d:*", i%10),
 					},
 					Condition: map[string]interface{}{
 						"StringEquals": map[string]interface{}{
@@ -703,8 +693,8 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 			{
 				Sid:      "ComplexConditionAccess",
 				Effect:   "Allow",
-				Action:   models.JSONActionResource{Single: "document:read", IsArray: false},
-				Resource: models.JSONActionResource{Single: "api:documents:*", IsArray: false},
+				Action:   models.JSONActionResource{Single: "document:read"},
+				Resource: models.JSONActionResource{Single: "api:documents:*"},
 				Condition: map[string]interface{}{
 					// Simplified conditions that should work
 					"StringEquals": map[string]interface{}{

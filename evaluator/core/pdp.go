@@ -390,7 +390,7 @@ func (pdp *PolicyDecisionPoint) matchesResourcePatterns(resourceSpec models.JSON
 // matchesNotResourcePatterns checks if the resource matches any NotResource exclusion patterns.
 func (pdp *PolicyDecisionPoint) matchesNotResourcePatterns(notResourceSpec models.JSONActionResource, requestedResource string, context map[string]interface{}) bool {
 	// If no NotResource patterns are specified, return false (no exclusions)
-	if !notResourceSpec.IsArray && notResourceSpec.Single == "" {
+	if notResourceSpec.Single == "" && len(notResourceSpec.Multiple) == 0 {
 		return false
 	}
 

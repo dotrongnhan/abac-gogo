@@ -75,15 +75,14 @@ Field Resource được implement bởi type `JSONActionResource` (dùng chung v
 type JSONActionResource struct {
     Single   string    // Giá trị đơn
     Multiple []string  // Giá trị mảng
-    IsArray  bool      // Flag xác định kiểu
 }
 
 // Lấy tất cả values dưới dạng slice
 func (j JSONActionResource) GetValues() []string {
-    if j.IsArray {
-        return j.Multiple
+    if j.Single != "" {
+        return []string{j.Single}
     }
-    return []string{j.Single}
+    return j.Multiple
 }
 ```
 

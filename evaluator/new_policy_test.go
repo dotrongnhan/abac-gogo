@@ -97,8 +97,7 @@ func TestJSONActionResource(t *testing.T) {
 			name:  "Single string",
 			input: `"document-service:file:read"`,
 			expected: models.JSONActionResource{
-				Single:  "document-service:file:read",
-				IsArray: false,
+				Single: "document-service:file:read",
 			},
 		},
 		{
@@ -106,7 +105,6 @@ func TestJSONActionResource(t *testing.T) {
 			input: `["document-service:file:read", "document-service:file:write"]`,
 			expected: models.JSONActionResource{
 				Multiple: []string{"document-service:file:read", "document-service:file:write"},
-				IsArray:  true,
 			},
 		},
 	}
@@ -119,22 +117,16 @@ func TestJSONActionResource(t *testing.T) {
 				t.Fatalf("Failed to unmarshal: %v", err)
 			}
 
-			if result.IsArray != test.expected.IsArray {
-				t.Errorf("IsArray = %v, want %v", result.IsArray, test.expected.IsArray)
-			}
-
-			if !result.IsArray && result.Single != test.expected.Single {
+			if result.Single != test.expected.Single {
 				t.Errorf("Single = %v, want %v", result.Single, test.expected.Single)
 			}
 
-			if result.IsArray {
-				if len(result.Multiple) != len(test.expected.Multiple) {
-					t.Errorf("Multiple length = %v, want %v", len(result.Multiple), len(test.expected.Multiple))
-				}
-				for i, v := range result.Multiple {
-					if v != test.expected.Multiple[i] {
-						t.Errorf("Multiple[%d] = %v, want %v", i, v, test.expected.Multiple[i])
-					}
+			if len(result.Multiple) != len(test.expected.Multiple) {
+				t.Errorf("Multiple length = %v, want %v", len(result.Multiple), len(test.expected.Multiple))
+			}
+			for i, v := range result.Multiple {
+				if i < len(test.expected.Multiple) && v != test.expected.Multiple[i] {
+					t.Errorf("Multiple[%d] = %v, want %v", i, v, test.expected.Multiple[i])
 				}
 			}
 		})
@@ -199,7 +191,6 @@ func TestNotResourceExclusion(t *testing.T) {
 		Action:   models.JSONActionResource{Single: "*:*:read"},
 		Resource: models.JSONActionResource{Single: "api:*:*"},
 		NotResource: models.JSONActionResource{
-			IsArray:  true,
 			Multiple: []string{"api:admin:*", "api:system:*"},
 		},
 	}

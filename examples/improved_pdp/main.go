@@ -316,11 +316,9 @@ func createEnhancedPolicy() *models.Policy {
 				Effect: "Allow",
 				Action: models.JSONActionResource{
 					Multiple: []string{"read", "list"},
-					IsArray:  true,
 				},
 				Resource: models.JSONActionResource{
-					Single:  "/api/reports/*",
-					IsArray: false,
+					Single: "/api/reports/*",
 				},
 				Condition: map[string]interface{}{
 					// Enhanced time-based conditions

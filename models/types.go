@@ -135,15 +135,14 @@ func (j *JSONStatements) Scan(value interface{}) error {
 type JSONActionResource struct {
 	Single   string
 	Multiple []string
-	IsArray  bool
 }
 
 // Value implements the driver.Valuer interface for GORM
 func (j JSONActionResource) Value() (driver.Value, error) {
-	if j.IsArray {
-		return json.Marshal(j.Multiple)
+	if j.Single != "" {
+		return json.Marshal(j.Single)
 	}
-	return json.Marshal(j.Single)
+	return json.Marshal(j.Multiple)
 }
 
 // Scan implements the sql.Scanner interface for GORM
@@ -166,7 +165,7 @@ func (j *JSONActionResource) Scan(value interface{}) error {
 	var arr []string
 	if err := json.Unmarshal(bytes, &arr); err == nil {
 		j.Multiple = arr
-		j.IsArray = true
+		j.Single = ""
 		return nil
 	}
 
@@ -174,7 +173,7 @@ func (j *JSONActionResource) Scan(value interface{}) error {
 	var str string
 	if err := json.Unmarshal(bytes, &str); err == nil {
 		j.Single = str
-		j.IsArray = false
+		j.Multiple = nil
 		return nil
 	}
 
@@ -187,7 +186,7 @@ func (j *JSONActionResource) UnmarshalJSON(data []byte) error {
 	var arr []string
 	if err := json.Unmarshal(data, &arr); err == nil {
 		j.Multiple = arr
-		j.IsArray = true
+		j.Single = ""
 		return nil
 	}
 
@@ -195,7 +194,7 @@ func (j *JSONActionResource) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err == nil {
 		j.Single = str
-		j.IsArray = false
+		j.Multiple = nil
 		return nil
 	}
 
@@ -204,18 +203,18 @@ func (j *JSONActionResource) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements custom JSON marshaling
 func (j JSONActionResource) MarshalJSON() ([]byte, error) {
-	if j.IsArray {
-		return json.Marshal(j.Multiple)
+	if j.Single != "" {
+		return json.Marshal(j.Single)
 	}
-	return json.Marshal(j.Single)
+	return json.Marshal(j.Multiple)
 }
 
 // GetValues returns all values as a slice
 func (j JSONActionResource) GetValues() []string {
-	if j.IsArray {
-		return j.Multiple
+	if j.Single != "" {
+		return []string{j.Single}
 	}
-	return []string{j.Single}
+	return j.Multiple
 }
 
 // Subject represents a user, service, or application

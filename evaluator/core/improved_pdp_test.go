@@ -240,8 +240,8 @@ func TestImprovedPDP_EnhancedConditionEvaluation(t *testing.T) {
 	statement := models.PolicyStatement{
 		Sid:      "EnhancedConditionTest",
 		Effect:   "Allow",
-		Action:   models.JSONActionResource{Single: "read", IsArray: false},
-		Resource: models.JSONActionResource{Single: "*", IsArray: false},
+		Action:   models.JSONActionResource{Single: "read"},
+		Resource: models.JSONActionResource{Single: "*"},
 		Condition: map[string]interface{}{
 			"StringContains": map[string]interface{}{
 				"user.department": "Engineering",
@@ -328,8 +328,8 @@ func TestImprovedPDP_PolicyFiltering(t *testing.T) {
 				{
 					Sid:      "DocumentRead",
 					Effect:   "Allow",
-					Action:   models.JSONActionResource{Single: "document:read", IsArray: false},
-					Resource: models.JSONActionResource{Single: "api:documents:*", IsArray: false},
+					Action:   models.JSONActionResource{Single: "document:read"},
+					Resource: models.JSONActionResource{Single: "api:documents:*"},
 				},
 			},
 		},
@@ -340,8 +340,8 @@ func TestImprovedPDP_PolicyFiltering(t *testing.T) {
 				{
 					Sid:      "ReportWrite",
 					Effect:   "Allow",
-					Action:   models.JSONActionResource{Single: "report:write", IsArray: false},
-					Resource: models.JSONActionResource{Single: "api:reports:*", IsArray: false},
+					Action:   models.JSONActionResource{Single: "report:write"},
+					Resource: models.JSONActionResource{Single: "api:reports:*"},
 				},
 			},
 		},
@@ -352,8 +352,8 @@ func TestImprovedPDP_PolicyFiltering(t *testing.T) {
 				{
 					Sid:      "DisabledPolicy",
 					Effect:   "Allow",
-					Action:   models.JSONActionResource{Single: "*", IsArray: false},
-					Resource: models.JSONActionResource{Single: "*", IsArray: false},
+					Action:   models.JSONActionResource{Single: "*"},
+					Resource: models.JSONActionResource{Single: "*"},
 				},
 			},
 		},
@@ -439,8 +439,8 @@ func TestImprovedPDP_IntegrationWithAllFeatures(t *testing.T) {
 			{
 				Sid:      "ComprehensiveAccess",
 				Effect:   "Allow",
-				Action:   models.JSONActionResource{Single: "document:read", IsArray: false},
-				Resource: models.JSONActionResource{Single: "api:documents:*", IsArray: false},
+				Action:   models.JSONActionResource{Single: "document:read"},
+				Resource: models.JSONActionResource{Single: "api:documents:*"},
 				Condition: map[string]interface{}{
 					// Simple condition for testing
 					"StringEquals": map[string]interface{}{

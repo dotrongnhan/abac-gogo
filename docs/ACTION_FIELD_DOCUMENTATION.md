@@ -70,15 +70,14 @@ Field Action được implement bởi type `JSONActionResource`:
 type JSONActionResource struct {
     Single   string    // Giá trị đơn
     Multiple []string  // Giá trị mảng
-    IsArray  bool      // Flag xác định kiểu
 }
 
 // Lấy tất cả values dưới dạng slice
 func (j JSONActionResource) GetValues() []string {
-    if j.IsArray {
-        return j.Multiple
+    if j.Single != "" {
+        return []string{j.Single}
     }
-    return []string{j.Single}
+    return j.Multiple
 }
 ```
 
@@ -91,7 +90,7 @@ Hệ thống tự động phát hiện định dạng khi parse JSON:
 var arr []string
 if err := json.Unmarshal(data, &arr); err == nil {
     j.Multiple = arr
-    j.IsArray = true
+    j.Single = ""
     return nil
 }
 
@@ -99,7 +98,7 @@ if err := json.Unmarshal(data, &arr); err == nil {
 var str string
 if err := json.Unmarshal(data, &str); err == nil {
     j.Single = str
-    j.IsArray = false
+    j.Multiple = nil
     return nil
 }
 ```
