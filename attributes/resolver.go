@@ -1,11 +1,15 @@
 package attributes
 
 import (
+	"context"
 	"fmt"
+	"net"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
 
+	"abac_go_example/constants"
 	"abac_go_example/models"
 	"abac_go_example/storage"
 )
@@ -22,24 +26,58 @@ func NewAttributeResolver(storage storage.Storage) *AttributeResolver {
 	}
 }
 
+// validateRequest validates the evaluation request
+func (r *AttributeResolver) validateRequest(request *models.EvaluationRequest) error {
+	if request == nil {
+		return fmt.Errorf("evaluation request cannot be nil")
+	}
+
+	if request.SubjectID == "" {
+		return fmt.Errorf("subject ID cannot be empty")
+	}
+
+	if request.ResourceID == "" {
+		return fmt.Errorf("resource ID cannot be empty")
+	}
+
+	if request.Action == "" {
+		return fmt.Errorf("action cannot be empty")
+	}
+
+	return nil
+}
+
 // EnrichContext enriches the evaluation context with all necessary attributes
 func (r *AttributeResolver) EnrichContext(request *models.EvaluationRequest) (*models.EvaluationContext, error) {
+	if err := r.validateRequest(request); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
 	// Get subject
 	subject, err := r.storage.GetSubject(request.SubjectID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get subject: %w", err)
+		return nil, fmt.Errorf("failed to retrieve subject '%s': %w", request.SubjectID, err)
+	}
+	if subject == nil {
+		return nil, fmt.Errorf("subject '%s' not found", request.SubjectID)
 	}
 
 	// Get resource
 	resource, err := r.storage.GetResource(request.ResourceID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get resource: %w", err)
+		return nil, fmt.Errorf("failed to retrieve resource '%s': %w", request.ResourceID, err)
+	}
+	if resource == nil {
+		return nil, fmt.Errorf("resource '%s' not found", request.ResourceID)
 	}
 
 	// Get action
 	action, err := r.storage.GetAction(request.Action)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get action: %w", err)
+		return nil, fmt.Errorf("failed to retrieve action '%s': %w", request.Action, err)
+	}
+	if action == nil {
+		return nil, fmt.Errorf("action '%s' not found", request.Action)
 	}
 
 	// Enrich environment context
@@ -57,6 +95,18 @@ func (r *AttributeResolver) EnrichContext(request *models.EvaluationRequest) (*m
 	}, nil
 }
 
+// EnrichContextWithTimeout enriches context with timeout support
+func (r *AttributeResolver) EnrichContextWithTimeout(ctx context.Context, request *models.EvaluationRequest) (*models.EvaluationContext, error) {
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	return r.EnrichContext(request)
+}
+
 // enrichEnvironmentContext adds computed environment attributes
 func (r *AttributeResolver) enrichEnvironmentContext(context map[string]interface{}) map[string]interface{} {
 	enriched := make(map[string]interface{})
@@ -67,24 +117,30 @@ func (r *AttributeResolver) enrichEnvironmentContext(context map[string]interfac
 	}
 
 	// Add current timestamp if not present
-	if _, exists := enriched["timestamp"]; !exists {
-		enriched["timestamp"] = time.Now().Format(time.RFC3339)
+	if _, exists := enriched[constants.ContextKeyTimestamp]; !exists {
+		enriched[constants.ContextKeyTimestamp] = time.Now().Format(time.RFC3339)
 	}
 
 	// Extract time_of_day from timestamp
-	if timestampStr, ok := enriched["timestamp"].(string); ok {
+	if timestampStr, ok := enriched[constants.ContextKeyTimestamp].(string); ok {
 		if t, err := time.Parse(time.RFC3339, timestampStr); err == nil {
-			enriched["time_of_day"] = t.Format("15:04")
-			enriched["day_of_week"] = strings.ToLower(t.Weekday().String())
-			enriched["hour"] = t.Hour()
-			enriched["is_business_hours"] = r.isBusinessHours(t)
+			enriched[constants.ContextKeyTimeOfDayShort] = t.Format("15:04")
+			enriched[constants.ContextKeyDayOfWeekShort] = strings.ToLower(t.Weekday().String())
+			enriched[constants.ContextKeyHour] = t.Hour()
+			enriched[constants.ContextKeyIsBusinessHours] = r.isBusinessHours(t)
 		}
 	}
 
 	// Add derived IP attributes
-	if sourceIP, ok := enriched["client_ip"].(string); ok {
-		enriched["is_internal_ip"] = r.isInternalIP(sourceIP)
-		enriched["ip_subnet"] = r.getIPSubnet(sourceIP)
+	if sourceIP, ok := enriched[constants.ContextKeyClientIPShort].(string); ok {
+		enriched[constants.ContextKeyIsInternalIP] = r.isInternalIP(sourceIP)
+		enriched[constants.ContextKeyIPSubnet] = r.getIPSubnet(sourceIP)
+	}
+
+	// Also check for 'source_ip' key for backward compatibility
+	if sourceIP, ok := enriched[constants.ContextKeySourceIP].(string); ok {
+		enriched[constants.ContextKeyIsInternalIP] = r.isInternalIP(sourceIP)
+		enriched[constants.ContextKeyIPSubnet] = r.getIPSubnet(sourceIP)
 	}
 
 	return enriched
@@ -97,17 +153,17 @@ func (r *AttributeResolver) resolveDynamicAttributes(subject *models.Subject, en
 	}
 
 	// Calculate years_of_service if hire_date is available
-	if hireDateStr, ok := subject.Attributes["hire_date"].(string); ok {
+	if hireDateStr, ok := subject.Attributes[constants.ContextKeyHireDate].(string); ok {
 		if hireDate, err := time.Parse("2006-01-02", hireDateStr); err == nil {
 			years := time.Since(hireDate).Hours() / (24 * 365.25)
-			subject.Attributes["years_of_service"] = int(years)
+			subject.Attributes[constants.ContextKeyYearsOfService] = int(years)
 		}
 	}
 
 	// Add computed attributes based on current time
 	now := time.Now()
-	subject.Attributes["current_hour"] = now.Hour()
-	subject.Attributes["current_day"] = strings.ToLower(now.Weekday().String())
+	subject.Attributes[constants.ContextKeyCurrentHour] = now.Hour()
+	subject.Attributes[constants.ContextKeyCurrentDay] = strings.ToLower(now.Weekday().String())
 }
 
 // GetAttributeValue retrieves a nested attribute value using dot notation
@@ -214,17 +270,37 @@ func (r *AttributeResolver) isBusinessHours(t time.Time) bool {
 	hour := t.Hour()
 	weekday := t.Weekday()
 
-	// Business hours: 8 AM to 6 PM, Monday to Friday
-	return weekday >= time.Monday && weekday <= time.Friday && hour >= 8 && hour < 18
+	// Use constants from business rules
+	return weekday >= constants.BusinessDayStart &&
+		weekday <= constants.BusinessDayEnd &&
+		hour >= constants.BusinessHoursStart &&
+		hour < constants.BusinessHoursEnd
 }
 
 func (r *AttributeResolver) isInternalIP(ip string) bool {
-	// Check for private IP ranges
-	return strings.HasPrefix(ip, "10.") ||
-		strings.HasPrefix(ip, "192.168.") ||
-		strings.HasPrefix(ip, "172.16.") ||
-		ip == "127.0.0.1" ||
-		ip == "localhost"
+	// Handle localhost string
+	if ip == "localhost" {
+		return true
+	}
+
+	// Parse IP address
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+
+	// Check against private IP ranges using CIDR
+	for _, cidr := range constants.PrivateIPRanges {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		if network.Contains(parsedIP) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *AttributeResolver) getIPSubnet(ip string) string {
@@ -245,13 +321,13 @@ func (r *AttributeResolver) MatchResourcePattern(pattern, resource string) bool 
 		return true
 	}
 
-	// Handle wildcard patterns
-	if strings.Contains(pattern, "*") {
-		// Convert wildcard pattern to regex
-		regexPattern := strings.ReplaceAll(pattern, "*", ".*")
-		regexPattern = "^" + regexPattern + "$"
+	// Use Go's built-in pattern matching for better accuracy
+	if matched, err := filepath.Match(pattern, resource); err == nil && matched {
+		return true
+	}
 
-		// Simple regex matching (could be improved with proper regex library)
+	// Fallback to simple wildcard matching for complex patterns
+	if strings.Contains(pattern, "*") {
 		return r.simpleWildcardMatch(pattern, resource)
 	}
 

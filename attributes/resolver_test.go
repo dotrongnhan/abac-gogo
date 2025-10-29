@@ -1,9 +1,11 @@
 package attributes
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"abac_go_example/constants"
 	"abac_go_example/models"
 )
 
@@ -78,10 +80,10 @@ func createMockStorage() *mockStorage {
 				ExternalID:  "john.doe@company.com",
 				SubjectType: "user",
 				Attributes: map[string]interface{}{
-					"department":      "engineering",
-					"role":            []string{"senior_developer", "code_reviewer"},
-					"clearance_level": 3,
-					"hire_date":       "2019-01-15",
+					"department":                 "engineering",
+					"role":                       []string{"senior_developer", "code_reviewer"},
+					"clearance_level":            3,
+					constants.ContextKeyHireDate: "2019-01-15",
 				},
 			},
 		},
@@ -118,8 +120,8 @@ func TestEnrichContext(t *testing.T) {
 		ResourceID: "res-001",
 		Action:     "read",
 		Context: map[string]interface{}{
-			"timestamp": "2024-01-15T14:00:00Z",
-			"source_ip": "10.0.1.100",
+			constants.ContextKeyTimestamp: "2024-01-15T14:00:00Z",
+			constants.ContextKeySourceIP:  "10.0.1.100",
 		},
 	}
 
@@ -146,19 +148,19 @@ func TestEnrichContext(t *testing.T) {
 	}
 
 	// Test environment enrichment
-	if _, exists := context.Environment["time_of_day"]; !exists {
+	if _, exists := context.Environment[constants.ContextKeyTimeOfDayShort]; !exists {
 		t.Error("Environment should have time_of_day")
 	}
 
-	if _, exists := context.Environment["day_of_week"]; !exists {
+	if _, exists := context.Environment[constants.ContextKeyDayOfWeekShort]; !exists {
 		t.Error("Environment should have day_of_week")
 	}
 
-	if _, exists := context.Environment["is_business_hours"]; !exists {
+	if _, exists := context.Environment[constants.ContextKeyIsBusinessHours]; !exists {
 		t.Error("Environment should have is_business_hours")
 	}
 
-	if _, exists := context.Environment["is_internal_ip"]; !exists {
+	if _, exists := context.Environment[constants.ContextKeyIsInternalIP]; !exists {
 		t.Error("Environment should have is_internal_ip")
 	}
 }
@@ -270,27 +272,27 @@ func TestEnvironmentEnrichment(t *testing.T) {
 	}{
 		{
 			input: map[string]interface{}{
-				"timestamp": "2024-01-15T14:00:00Z",
-				"source_ip": "10.0.1.100",
+				constants.ContextKeyTimestamp: "2024-01-15T14:00:00Z",
+				constants.ContextKeySourceIP:  "10.0.1.100",
 			},
 			expected: map[string]interface{}{
-				"time_of_day":       "14:00",
-				"day_of_week":       "monday",
-				"hour":              14,
-				"is_business_hours": true,
-				"is_internal_ip":    true,
-				"ip_subnet":         "10.0.1.0/24",
+				constants.ContextKeyTimeOfDayShort:  "14:00",
+				constants.ContextKeyDayOfWeekShort:  "monday",
+				constants.ContextKeyHour:            14,
+				constants.ContextKeyIsBusinessHours: true,
+				constants.ContextKeyIsInternalIP:    true,
+				constants.ContextKeyIPSubnet:        "10.0.1.0/24",
 			},
 		},
 		{
 			input: map[string]interface{}{
-				"timestamp": "2024-01-15T22:00:00Z",
-				"source_ip": "203.0.113.1",
+				constants.ContextKeyTimestamp: "2024-01-15T22:00:00Z",
+				constants.ContextKeySourceIP:  "203.0.113.1",
 			},
 			expected: map[string]interface{}{
-				"time_of_day":       "22:00",
-				"is_business_hours": false,
-				"is_internal_ip":    false,
+				constants.ContextKeyTimeOfDayShort:  "22:00",
+				constants.ContextKeyIsBusinessHours: false,
+				constants.ContextKeyIsInternalIP:    false,
 			},
 		},
 	}
@@ -314,29 +316,29 @@ func TestDynamicAttributeResolution(t *testing.T) {
 	subject := &models.Subject{
 		ID: "sub-001",
 		Attributes: map[string]interface{}{
-			"hire_date": "2019-01-15",
+			constants.ContextKeyHireDate: "2019-01-15",
 		},
 	}
 
 	environment := map[string]interface{}{
-		"timestamp": time.Now().Format(time.RFC3339),
+		constants.ContextKeyTimestamp: time.Now().Format(time.RFC3339),
 	}
 
 	resolver.resolveDynamicAttributes(subject, environment)
 
 	// Check that years_of_service was calculated
-	if yearsOfService, exists := subject.Attributes["years_of_service"]; !exists {
+	if yearsOfService, exists := subject.Attributes[constants.ContextKeyYearsOfService]; !exists {
 		t.Error("Expected years_of_service to be calculated")
 	} else if years, ok := yearsOfService.(int); !ok || years < 5 {
 		t.Errorf("Expected years_of_service to be at least 5, got %v", yearsOfService)
 	}
 
 	// Check that current time attributes were added
-	if _, exists := subject.Attributes["current_hour"]; !exists {
+	if _, exists := subject.Attributes[constants.ContextKeyCurrentHour]; !exists {
 		t.Error("Expected current_hour to be added")
 	}
 
-	if _, exists := subject.Attributes["current_day"]; !exists {
+	if _, exists := subject.Attributes[constants.ContextKeyCurrentDay]; !exists {
 		t.Error("Expected current_day to be added")
 	}
 }
@@ -405,5 +407,216 @@ func TestGetIPSubnet(t *testing.T) {
 		if result != tc.expected {
 			t.Errorf("getIPSubnet(%s) = %s, expected %s", tc.ip, result, tc.expected)
 		}
+	}
+}
+
+// Test input validation
+func TestValidateRequest(t *testing.T) {
+	resolver := NewAttributeResolver(createMockStorage())
+
+	testCases := []struct {
+		name        string
+		request     *models.EvaluationRequest
+		expectError bool
+	}{
+		{
+			name:        "nil request",
+			request:     nil,
+			expectError: true,
+		},
+		{
+			name: "empty subject ID",
+			request: &models.EvaluationRequest{
+				SubjectID:  "",
+				ResourceID: "res-001",
+				Action:     "read",
+			},
+			expectError: true,
+		},
+		{
+			name: "empty resource ID",
+			request: &models.EvaluationRequest{
+				SubjectID:  "sub-001",
+				ResourceID: "",
+				Action:     "read",
+			},
+			expectError: true,
+		},
+		{
+			name: "empty action",
+			request: &models.EvaluationRequest{
+				SubjectID:  "sub-001",
+				ResourceID: "res-001",
+				Action:     "",
+			},
+			expectError: true,
+		},
+		{
+			name: "valid request",
+			request: &models.EvaluationRequest{
+				SubjectID:  "sub-001",
+				ResourceID: "res-001",
+				Action:     "read",
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := resolver.validateRequest(tc.request)
+			if tc.expectError && err == nil {
+				t.Errorf("Expected error for %s, but got none", tc.name)
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("Expected no error for %s, but got: %v", tc.name, err)
+			}
+		})
+	}
+}
+
+// Test context timeout support
+func TestEnrichContextWithTimeout(t *testing.T) {
+	storage := createMockStorage()
+	resolver := NewAttributeResolver(storage)
+
+	request := &models.EvaluationRequest{
+		RequestID:  "test-001",
+		SubjectID:  "sub-001",
+		ResourceID: "res-001",
+		Action:     "read",
+		Context: map[string]interface{}{
+			constants.ContextKeyTimestamp: "2024-01-15T14:00:00Z",
+			constants.ContextKeySourceIP:  "10.0.1.100",
+		},
+	}
+
+	// Test with valid context
+	ctx := context.Background()
+	enrichedContext, err := resolver.EnrichContextWithTimeout(ctx, request)
+	if err != nil {
+		t.Fatalf("Failed to enrich context with timeout: %v", err)
+	}
+	if enrichedContext == nil {
+		t.Error("Context should not be nil")
+	}
+
+	// Test with cancelled context
+	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err = resolver.EnrichContextWithTimeout(cancelledCtx, request)
+	if err == nil {
+		t.Error("Expected error with cancelled context")
+	}
+}
+
+// Test improved IP detection with CIDR
+func TestImprovedIPDetection(t *testing.T) {
+	resolver := NewAttributeResolver(createMockStorage())
+
+	testCases := []struct {
+		ip          string
+		expected    bool
+		description string
+	}{
+		{"10.0.1.100", true, "Class A private network"},
+		{"192.168.1.100", true, "Class C private network"},
+		{"172.16.1.100", true, "Class B private network (start)"},
+		{"172.31.255.254", true, "Class B private network (end)"},
+		{"127.0.0.1", true, "Loopback address"},
+		{"127.255.255.254", true, "Loopback range"},
+		{"localhost", true, "Localhost string"},
+		{"203.0.113.1", false, "Public IP"},
+		{"8.8.8.8", false, "Google DNS"},
+		{"172.15.255.254", false, "Just outside private range"},
+		{"172.32.0.1", false, "Just outside private range"},
+		{"invalid-ip", false, "Invalid IP format"},
+		{"", false, "Empty string"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result := resolver.isInternalIP(tc.ip)
+			if result != tc.expected {
+				t.Errorf("isInternalIP(%s) = %v, expected %v (%s)",
+					tc.ip, result, tc.expected, tc.description)
+			}
+		})
+	}
+}
+
+// Test enhanced pattern matching
+func TestEnhancedPatternMatching(t *testing.T) {
+	resolver := NewAttributeResolver(createMockStorage())
+
+	testCases := []struct {
+		pattern     string
+		resource    string
+		expected    bool
+		description string
+	}{
+		{"*", "/api/v1/users", true, "Universal wildcard"},
+		{"/api/v1/users", "/api/v1/users", true, "Exact match"},
+		{"/api/v1/*", "/api/v1/users", true, "Simple wildcard"},
+		{"/api/*/users", "/api/v1/users", true, "Middle wildcard"},
+		{"*.txt", "document.txt", true, "File extension pattern"},
+		{"DOC-*-FINANCE", "DOC-2024-FINANCE", true, "Complex pattern"},
+		{"/api/v2/*", "/api/v1/users", false, "No match"},
+		{"*.pdf", "document.txt", false, "Wrong extension"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result := resolver.MatchResourcePattern(tc.pattern, tc.resource)
+			if result != tc.expected {
+				t.Errorf("MatchResourcePattern(%s, %s) = %v, expected %v (%s)",
+					tc.pattern, tc.resource, result, tc.expected, tc.description)
+			}
+		})
+	}
+}
+
+// Test error handling in EnrichContext
+func TestEnrichContextErrorHandling(t *testing.T) {
+	resolver := NewAttributeResolver(createMockStorage())
+
+	// Test with nil request
+	_, err := resolver.EnrichContext(nil)
+	if err == nil {
+		t.Error("Expected error for nil request")
+	}
+
+	// Test with non-existent subject
+	invalidRequest := &models.EvaluationRequest{
+		SubjectID:  "non-existent",
+		ResourceID: "res-001",
+		Action:     "read",
+	}
+	_, err = resolver.EnrichContext(invalidRequest)
+	if err == nil {
+		t.Error("Expected error for non-existent subject")
+	}
+
+	// Test with non-existent resource
+	invalidRequest2 := &models.EvaluationRequest{
+		SubjectID:  "sub-001",
+		ResourceID: "non-existent",
+		Action:     "read",
+	}
+	_, err = resolver.EnrichContext(invalidRequest2)
+	if err == nil {
+		t.Error("Expected error for non-existent resource")
+	}
+
+	// Test with non-existent action
+	invalidRequest3 := &models.EvaluationRequest{
+		SubjectID:  "sub-001",
+		ResourceID: "res-001",
+		Action:     "non-existent",
+	}
+	_, err = resolver.EnrichContext(invalidRequest3)
+	if err == nil {
+		t.Error("Expected error for non-existent action")
 	}
 }
