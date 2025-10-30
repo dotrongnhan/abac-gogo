@@ -217,8 +217,9 @@ func (rm *ResourceMatcher) validateResourceFormat(resource string) bool {
 func (rm *ResourceMatcher) validateSimpleResourceFormat(resource string) bool {
 	parts := strings.Split(resource, ":")
 
-	// Must have at least 3 parts: service:type:id
-	if len(parts) < 3 {
+	// Must have at least 2 parts for flexibility (was 3)
+	// This allows hierarchical child resources like "file:doc-456"
+	if len(parts) < 2 {
 		return false
 	}
 

@@ -53,7 +53,7 @@ abac_go_example/
 │   ├── context_keys.go         # Context key definitions
 │   ├── policy_constants.go     # Policy-related constants
 │   └── evaluator_constants.go  # NEW: All evaluator constants
-└── docs/                       # Documentation
+└── docs/                       # Consolidated documentation guides
 ```
 
 ## 🚀 Quick Start
@@ -430,10 +430,11 @@ func (s *SecureService) GetUser(ctx context.Context, subjectID, userID string) e
 - **[Audit](audit/README.md)** - Logging and compliance
 - **[Models](models/README.md)** - Data models and types
 
-### Additional Documentation
-- **[Action Field Guide](docs/ACTION_FIELD_DOCUMENTATION.md)** - Action pattern documentation
-- **[Condition Guide](docs/CONDITION_FIELD_GUIDE.md)** - Condition operator reference
-- **[Resource Field Guide](docs/RESOURCE_FIELD_DOCUMENTATION.md)** - Resource pattern documentation
+### Documentation Guides
+- **[Action Guide](docs/ACTION_GUIDE.md)** - Action pattern documentation
+- **[Resource Guide](docs/RESOURCE_GUIDE.md)** - Resource pattern documentation  
+- **[Condition Guide](docs/CONDITION_GUIDE.md)** - Condition operator reference
+- **[Hierarchical Resource Guide](docs/HIERARCHICAL_RESOURCE_GUIDE.md)** - Advanced hierarchical patterns
 
 ## 🛠️ Development
 
