@@ -271,8 +271,14 @@ api:documents:org:*/dept:*/project:*/file:public-*
 
 ### Code Usage
 ```go
+// Create subject from user ID
+subject, err := storage.BuildSubjectFromUser("user-123")
+if err != nil {
+    return err
+}
+
 request := &models.EvaluationRequest{
-    SubjectID:  "user-123",
+    Subject:    subject,
     ResourceID: "api:documents:org:acme-corp/dept:engineering/project:alpha/file:spec.pdf",
     Action:     "document-service:file:read",
     Context: map[string]interface{}{

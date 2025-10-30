@@ -73,9 +73,15 @@ func (a *AuditLogger) LogEvaluation(request *models.EvaluationRequest, decision 
 		auditContext["action_category"] = context.Action.ActionCategory
 	}
 
+	// Get subject ID from Subject interface
+	subjectID := ""
+	if request.Subject != nil {
+		subjectID = request.Subject.GetID()
+	}
+
 	auditEntry := models.AuditLog{
 		RequestID:    request.RequestID,
-		SubjectID:    request.SubjectID,
+		SubjectID:    subjectID,
 		ResourceID:   request.ResourceID,
 		ActionID:     request.Action,
 		Decision:     decision.Result,
@@ -89,9 +95,15 @@ func (a *AuditLogger) LogEvaluation(request *models.EvaluationRequest, decision 
 
 // LogAccessAttempt logs an access attempt with additional context
 func (a *AuditLogger) LogAccessAttempt(request *models.EvaluationRequest, decision *models.Decision, additionalContext map[string]interface{}) error {
+	// Get subject ID from Subject interface
+	subjectID := ""
+	if request.Subject != nil {
+		subjectID = request.Subject.GetID()
+	}
+
 	auditEntry := models.AuditLog{
 		RequestID:    request.RequestID,
-		SubjectID:    request.SubjectID,
+		SubjectID:    subjectID,
 		ResourceID:   request.ResourceID,
 		ActionID:     request.Action,
 		Decision:     decision.Result,

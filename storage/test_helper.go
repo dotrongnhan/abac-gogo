@@ -201,7 +201,7 @@ func SeedTestData(t *testing.T, storage *PostgreSQLStorage) {
 			Version:     "2024-10-21",
 			Enabled:     true,
 			Statement: models.JSONStatements{
-				{
+				models.PolicyStatement{
 					Sid:    "EngineeringReadAccess",
 					Effect: "Allow",
 					Action: models.JSONActionResource{
@@ -226,7 +226,7 @@ func SeedTestData(t *testing.T, storage *PostgreSQLStorage) {
 			Version:     "2024-10-21",
 			Enabled:     true,
 			Statement: models.JSONStatements{
-				{
+				models.PolicyStatement{
 					Sid:    "DenyProbationWrite",
 					Effect: "Deny",
 					Action: models.JSONActionResource{

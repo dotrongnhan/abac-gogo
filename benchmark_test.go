@@ -22,7 +22,7 @@ func BenchmarkSingleEvaluation(b *testing.B) {
 
 	request := &models.EvaluationRequest{
 		RequestID:  "bench-001",
-		SubjectID:  "sub-001",
+		Subject:    models.NewMockUserSubject("sub-001", "sub-001"),
 		ResourceID: "res-001",
 		Action:     "read",
 	}

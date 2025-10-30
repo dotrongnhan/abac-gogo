@@ -138,8 +138,12 @@ func (spep *SimplePolicyEnforcementPoint) validateRequest(request *models.Evalua
 		return fmt.Errorf("request cannot be nil")
 	}
 
-	if request.SubjectID == "" {
-		return fmt.Errorf("subject_id is required")
+	if request.Subject == nil {
+		return fmt.Errorf("subject is required")
+	}
+
+	if request.Subject.GetID() == "" {
+		return fmt.Errorf("subject ID is required")
 	}
 
 	if request.ResourceID == "" {
@@ -152,7 +156,7 @@ func (spep *SimplePolicyEnforcementPoint) validateRequest(request *models.Evalua
 
 	// Additional strict validation if enabled
 	if spep.config.StrictValidation {
-		if len(request.SubjectID) > 255 {
+		if len(request.Subject.GetID()) > 255 {
 			return fmt.Errorf("subject_id too long (max 255 characters)")
 		}
 		if len(request.ResourceID) > 255 {
@@ -185,9 +189,15 @@ func (spep *SimplePolicyEnforcementPoint) auditDecision(request *models.Evaluati
 		return
 	}
 
+	// Get subject ID from Subject interface
+	subjectID := ""
+	if request.Subject != nil {
+		subjectID = request.Subject.GetID()
+	}
+
 	auditData := map[string]interface{}{
 		"request_id":       request.RequestID,
-		"subject_id":       request.SubjectID,
+		"subject_id":       subjectID,
 		"resource_id":      request.ResourceID,
 		"action":           request.Action,
 		"decision":         result.Decision,

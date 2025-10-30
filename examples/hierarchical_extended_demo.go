@@ -445,7 +445,7 @@ func runTestCases(scenario string, testCases []struct {
 		// Create evaluation request
 		request := &models.EvaluationRequest{
 			RequestID:  fmt.Sprintf("test-%d", i+1),
-			SubjectID:  "test-user",
+			Subject:    models.NewMockUserSubject("test-user", "test-user"),
 			ResourceID: tc.resource,
 			Action:     tc.action,
 			Context:    tc.user,

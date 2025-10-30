@@ -66,7 +66,7 @@ func TestLogEvaluation(t *testing.T) {
 	// Create test data
 	request := &models.EvaluationRequest{
 		RequestID:  "test-001",
-		SubjectID:  "sub-001",
+		Subject:    models.NewMockUserSubject("sub-001", "sub-001"),
 		ResourceID: "res-001",
 		Action:     "read",
 		Context: map[string]interface{}{
@@ -127,8 +127,9 @@ func TestLogEvaluation(t *testing.T) {
 		t.Errorf("Expected RequestID %s, got %s", request.RequestID, logEntry.RequestID)
 	}
 
-	if logEntry.SubjectID != request.SubjectID {
-		t.Errorf("Expected SubjectID %s, got %s", request.SubjectID, logEntry.SubjectID)
+	expectedSubjectID := request.Subject.GetID()
+	if logEntry.SubjectID != expectedSubjectID {
+		t.Errorf("Expected SubjectID %s, got %s", expectedSubjectID, logEntry.SubjectID)
 	}
 
 	if logEntry.Decision != decision.Result {
@@ -172,7 +173,7 @@ func TestLogAccessAttempt(t *testing.T) {
 
 	request := &models.EvaluationRequest{
 		RequestID:  "access-001",
-		SubjectID:  "sub-001",
+		Subject:    models.NewMockUserSubject("sub-001", "sub-001"),
 		ResourceID: "res-001",
 		Action:     "read",
 		Context: map[string]interface{}{

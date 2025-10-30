@@ -38,8 +38,8 @@ func TestSimplePolicyEnforcementPoint_EnforceRequest(t *testing.T) {
 			name: "Valid permit request",
 			request: &models.EvaluationRequest{
 				RequestID:  "test-001",
-				SubjectID:  "sub-001", // Engineering user
-				ResourceID: "res-001", // Use existing resource ID from mock data
+				Subject:    models.NewMockUserSubject("sub-001", "sub-001"), // Engineering user
+				ResourceID: "res-001",                                       // Use existing resource ID from mock data
 				Action:     "read",
 				Context: map[string]interface{}{
 					"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -52,8 +52,8 @@ func TestSimplePolicyEnforcementPoint_EnforceRequest(t *testing.T) {
 			name: "Valid deny request",
 			request: &models.EvaluationRequest{
 				RequestID:  "test-002",
-				SubjectID:  "sub-004", // User on probation
-				ResourceID: "res-001", // Use existing resource ID
+				Subject:    models.NewMockUserSubject("sub-004", "sub-004"), // User on probation
+				ResourceID: "res-001",                                       // Use existing resource ID
 				Action:     "write",
 				Context: map[string]interface{}{
 					"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -66,7 +66,7 @@ func TestSimplePolicyEnforcementPoint_EnforceRequest(t *testing.T) {
 			name: "Invalid request - missing subject",
 			request: &models.EvaluationRequest{
 				RequestID:  "test-003",
-				SubjectID:  "",
+				Subject:    nil, // Missing subject
 				ResourceID: "/api/v1/users",
 				Action:     "read",
 			},
@@ -77,7 +77,7 @@ func TestSimplePolicyEnforcementPoint_EnforceRequest(t *testing.T) {
 			name: "Invalid request - missing resource",
 			request: &models.EvaluationRequest{
 				RequestID:  "test-004",
-				SubjectID:  "sub-001",
+				Subject:    models.NewMockUserSubject("sub-001", "sub-001"),
 				ResourceID: "",
 				Action:     "read",
 			},
@@ -88,7 +88,7 @@ func TestSimplePolicyEnforcementPoint_EnforceRequest(t *testing.T) {
 			name: "Invalid request - missing action",
 			request: &models.EvaluationRequest{
 				RequestID:  "test-005",
-				SubjectID:  "sub-001",
+				Subject:    models.NewMockUserSubject("sub-001", "sub-001"),
 				ResourceID: "res-001",
 				Action:     "",
 			},
@@ -146,7 +146,7 @@ func TestSimplePolicyEnforcementPoint_Metrics(t *testing.T) {
 	ctx := context.Background()
 	request := &models.EvaluationRequest{
 		RequestID:  "test-metrics",
-		SubjectID:  "sub-001",
+		Subject:    models.NewMockUserSubject("sub-001", "sub-001"),
 		ResourceID: "res-001",
 		Action:     "read",
 	}
@@ -192,7 +192,7 @@ func TestSimplePolicyEnforcementPoint_Validation(t *testing.T) {
 		{
 			name: "Long subject ID",
 			request: &models.EvaluationRequest{
-				SubjectID:  string(make([]byte, 300)), // Too long
+				Subject:    models.NewMockUserSubject(string(make([]byte, 300)), "test"), // Too long
 				ResourceID: "test",
 				Action:     "read",
 			},
@@ -200,7 +200,7 @@ func TestSimplePolicyEnforcementPoint_Validation(t *testing.T) {
 		{
 			name: "Long resource ID",
 			request: &models.EvaluationRequest{
-				SubjectID:  "test",
+				Subject:    models.NewMockUserSubject("test", "test"),
 				ResourceID: string(make([]byte, 300)), // Too long
 				Action:     "read",
 			},
@@ -208,7 +208,7 @@ func TestSimplePolicyEnforcementPoint_Validation(t *testing.T) {
 		{
 			name: "Long action",
 			request: &models.EvaluationRequest{
-				SubjectID:  "test",
+				Subject:    models.NewMockUserSubject("test", "test"),
 				ResourceID: "test",
 				Action:     string(make([]byte, 150)), // Too long
 			},
@@ -249,7 +249,7 @@ func TestSimplePolicyEnforcementPoint_Timeout(t *testing.T) {
 
 	request := &models.EvaluationRequest{
 		RequestID:  "test-timeout",
-		SubjectID:  "sub-001",
+		Subject:    models.NewMockUserSubject("sub-001", "sub-001"),
 		ResourceID: "res-001",
 		Action:     "read",
 	}

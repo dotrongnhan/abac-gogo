@@ -2,7 +2,7 @@
 
 A comprehensive **Attribute-Based Access Control (ABAC)** system implemented in Go 1.23+, featuring advanced policy evaluation, PostgreSQL storage, HTTP service integration, and enterprise-grade security controls.
 
-> **🆕 NEW: User-Based ABAC Architecture** - The system now supports structured user attributes with relational data models (users, departments, positions, roles) while maintaining backward compatibility with the legacy subject model.
+> **🆕 NEW: User-Based ABAC Architecture** - The system has been fully migrated to structured user attributes with relational data models (users, departments, positions, roles) using a clean Subject interface abstraction. All legacy SubjectID references have been removed.
 
 ## ✨ Key Features
 
@@ -15,7 +15,7 @@ A comprehensive **Attribute-Based Access Control (ABAC)** system implemented in 
 - **🧪 Extensive Testing**: 85%+ test coverage with integration and benchmark tests
 - **👥 User-Based Attributes**: Structured relational data for users, departments, positions, and roles
 - **🔌 Subject Abstraction**: Flexible subject interface supporting users, services, and API keys
-- **🔄 Backward Compatible**: Legacy subject model still supported for smooth migration
+- **🏭 Production Ready**: Clean architecture with no legacy code, fully migrated to subject interface
 
 ## 🏗️ Architecture Overview
 
@@ -155,22 +155,21 @@ UserSubject automatically maps relational data to flat attributes:
 | Profile.SecurityClearance | `clearance` | "confidential" |
 | Roles[].RoleCode | `roles` | ["developer", "reviewer"] |
 
-### Migration Path
+### Migration Status
 
-**Phase 1: Dual Support (Current)**
-- Both legacy Subject and new User models coexist
-- PDP accepts both `SubjectID` (string) and `Subject` (interface)
-- Middleware tries new authentication first, falls back to legacy
+**✅ Migration Completed (October 30, 2025)**
+- All legacy SubjectID references removed
+- PDP exclusively uses `Subject` interface
+- Middleware uses `SubjectFactory.CreateFromRequest()`
+- Clean architecture with no backward compatibility code
+- All tests and documentation updated
 
-**Phase 2: Gradual Migration**
-- Update client applications to use X-User-ID header
-- Migrate data from `subjects` table to `users` + related tables
-- Update policies to use new attribute keys
-
-**Phase 3: Deprecation**
-- Remove legacy Subject model support
-- Clean up backward compatibility code
-- Update all documentation
+**Current Architecture:**
+- User authentication via X-User-ID header
+- Service authentication via X-Service-Name header (planned)
+- Subject interface as the sole abstraction
+- Database stores users in relational tables
+- ABAC evaluation uses flat attribute map from Subject.GetAttributes()
 
 ### Usage Examples
 
@@ -540,17 +539,29 @@ docker-compose up -d
 
 ### HTTP Middleware Integration
 ```go
-import "abac_go_example/evaluator/core"
+import (
+    "abac_go_example/evaluator/core"
+    "abac_go_example/models"
+)
 
 type ABACService struct {
-    pdp     core.PolicyDecisionPointInterface
-    storage storage.Storage
+    pdp            core.PolicyDecisionPointInterface
+    storage        storage.Storage
+    subjectFactory *models.SubjectFactory
 }
 
 func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFunc {
     return func(c *gin.Context) {
+        // Create subject from request (uses X-User-ID header or JWT)
+        subject, err := service.subjectFactory.CreateFromRequest(c.Request)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authentication"})
+            c.Abort()
+            return
+        }
+
         request := &models.EvaluationRequest{
-            SubjectID:  c.GetHeader("X-Subject-ID"),
+            Subject:    subject,
             ResourceID: c.Request.URL.Path,
             Action:     requiredAction,
             Context: map[string]interface{}{
@@ -573,16 +584,26 @@ func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFun
 
 ### Service Integration
 ```go
-import "abac_go_example/evaluator/core"
+import (
+    "abac_go_example/evaluator/core"
+    "abac_go_example/models"
+)
 
 type SecureService struct {
-    pdp core.PolicyDecisionPointInterface
+    pdp     core.PolicyDecisionPointInterface
+    storage storage.Storage
 }
 
-func (s *SecureService) GetUser(ctx context.Context, subjectID, userID string) error {
+func (s *SecureService) GetUser(ctx context.Context, requestingUserID, targetUserID string) error {
+    // Build subject from user ID
+    subject, err := s.storage.BuildSubjectFromUser(requestingUserID)
+    if err != nil {
+        return fmt.Errorf("failed to build subject: %w", err)
+    }
+
     request := &models.EvaluationRequest{
-        SubjectID:  subjectID,
-        ResourceID: fmt.Sprintf("user:%s", userID),
+        Subject:    subject,
+        ResourceID: fmt.Sprintf("user:%s", targetUserID),
         Action:     "read",
     }
     

@@ -63,7 +63,7 @@ func timeBasedExampleImproved(pdp core.PolicyDecisionPointInterface) {
 	now := time.Now()
 	request := &models.EvaluationRequest{
 		RequestID:  "time-001",
-		SubjectID:  "user123",
+		Subject:    models.NewMockUserSubject("user123", "user123"),
 		ResourceID: "/api/reports",
 		Action:     "read",
 		Timestamp:  &now, // Enhanced: explicit timestamp
@@ -99,7 +99,7 @@ func environmentalContextExample(pdp core.PolicyDecisionPointInterface) {
 	// Create request with rich environmental context
 	request := &models.EvaluationRequest{
 		RequestID:  "env-001",
-		SubjectID:  "user456",
+		Subject:    models.NewMockUserSubject("user456", "user456"),
 		ResourceID: "/api/financial/reports",
 		Action:     "read",
 		Environment: &models.EnvironmentInfo{
@@ -144,7 +144,7 @@ func structuredAttributesExample(pdp core.PolicyDecisionPointInterface) {
 	// Create request that will benefit from structured attributes
 	request := &models.EvaluationRequest{
 		RequestID:  "struct-001",
-		SubjectID:  "user789",
+		Subject:    models.NewMockUserSubject("user789", "user789"),
 		ResourceID: "/documents/confidential/project-alpha.pdf",
 		Action:     "read",
 		Context: map[string]interface{}{
@@ -184,7 +184,7 @@ func enhancedConditionExample(pdp core.PolicyDecisionPointInterface) {
 	// Example request that would use enhanced conditions
 	request := &models.EvaluationRequest{
 		RequestID:  "enhanced-001",
-		SubjectID:  "user999",
+		Subject:    models.NewMockUserSubject("user999", "user999"),
 		ResourceID: "/api/admin/users",
 		Action:     "write",
 		Environment: &models.EnvironmentInfo{
@@ -220,19 +220,19 @@ func policyFilteringExample(pdp core.PolicyDecisionPointInterface) {
 	requests := []*models.EvaluationRequest{
 		{
 			RequestID:  "filter-001",
-			SubjectID:  "user1",
+			Subject:    models.NewMockUserSubject("user1", "user1"),
 			ResourceID: "/api/users",
 			Action:     "read",
 		},
 		{
 			RequestID:  "filter-002",
-			SubjectID:  "user2",
+			Subject:    models.NewMockUserSubject("user2", "user2"),
 			ResourceID: "/api/reports",
 			Action:     "read",
 		},
 		{
 			RequestID:  "filter-003",
-			SubjectID:  "user3",
+			Subject:    models.NewMockUserSubject("user3", "user3"),
 			ResourceID: "/api/admin",
 			Action:     "write",
 		},
@@ -267,7 +267,7 @@ func preFilteringExample(pdp core.PolicyDecisionPointInterface) {
 	// Example showing how pre-filtering works
 	request := &models.EvaluationRequest{
 		RequestID:  "prefilter-001",
-		SubjectID:  "service-account-123",
+		Subject:    models.NewMockUserSubject("service-account-123", "service-account-123"),
 		ResourceID: "/api/payments/process",
 		Action:     "execute",
 		Environment: &models.EnvironmentInfo{
