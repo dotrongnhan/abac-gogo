@@ -43,7 +43,6 @@ func NewPolicyDecisionPoint(storage storage.Storage) PolicyDecisionPointInterfac
 }
 
 // Evaluate performs optimized policy evaluation for a given request
-// This unified method combines the best practices from both legacy approaches
 func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*models.Decision, error) {
 	startTime := time.Now()
 
@@ -52,14 +51,12 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 		return nil, fmt.Errorf("evaluation request cannot be nil")
 	}
 
-	// Support both new Subject interface and legacy SubjectID
-	subjectID := request.SubjectID
-	if request.Subject != nil {
-		subjectID = request.Subject.GetID()
+	if request.Subject == nil {
+		return nil, fmt.Errorf("subject is required")
 	}
 
-	if subjectID == "" || request.ResourceID == "" || request.Action == "" {
-		return nil, fmt.Errorf("invalid request: missing required fields (SubjectID/Subject, ResourceID, Action)")
+	if request.ResourceID == "" || request.Action == "" {
+		return nil, fmt.Errorf("invalid request: missing required fields (ResourceID, Action)")
 	}
 
 	// Step 1: Enrich context with all necessary attributes
@@ -92,7 +89,7 @@ func (pdp *PolicyDecisionPoint) BuildEnhancedEvaluationContext(request *models.E
 	evalContext := make(map[string]interface{}, constants.DefaultContextMapSize)
 
 	// Request context
-	evalContext[constants.ContextKeyRequestUserID] = request.SubjectID
+	evalContext[constants.ContextKeyRequestUserID] = request.Subject.GetID()
 	evalContext[constants.ContextKeyRequestAction] = request.Action
 	evalContext[constants.ContextKeyRequestResourceID] = request.ResourceID
 	evalContext[constants.ContextKeyRequestTime] = context.Timestamp.Format(time.RFC3339)

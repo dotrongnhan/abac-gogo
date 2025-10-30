@@ -311,7 +311,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 			name: "Business hours document access - should allow",
 			request: &models.EvaluationRequest{
 				RequestID:  "scenario-001",
-				Subject:    models.NewMockUserSubject("emp-001", "emp-001"),
+				SubjectID:  "emp-001",
 				ResourceID: "api:documents:project-specs.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)), // Thursday 14:30
@@ -337,7 +337,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 			name: "Confidential document access - should allow for senior staff",
 			request: &models.EvaluationRequest{
 				RequestID:  "scenario-002",
-				Subject:    models.NewMockUserSubject("senior-001", "senior-001"),
+				SubjectID:  "senior-001",
 				ResourceID: "api:documents:confidential",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 10, 0, 0, 0, time.UTC)),
@@ -365,7 +365,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 			name: "Weekend restriction - should deny sensitive operations",
 			request: &models.EvaluationRequest{
 				RequestID:  "scenario-003",
-				Subject:    models.NewMockUserSubject("emp-002", "emp-002"),
+				SubjectID:  "emp-002",
 				ResourceID: "api:documents:important-file.pdf",
 				Action:     "document:delete",
 				Timestamp:  timePtr(time.Date(2024, 10, 26, 15, 0, 0, 0, time.UTC)), // Saturday 15:00
@@ -390,7 +390,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 			name: "Mobile device restriction - should deny admin actions",
 			request: &models.EvaluationRequest{
 				RequestID:  "scenario-004",
-				Subject:    models.NewMockUserSubject("admin-001", "admin-001"),
+				SubjectID:  "admin-001",
 				ResourceID: "api:admin:user-management",
 				Action:     "admin:user:delete",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 11, 0, 0, 0, time.UTC)),
@@ -416,7 +416,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 			name: "After hours access - should deny",
 			request: &models.EvaluationRequest{
 				RequestID:  "scenario-005",
-				Subject:    models.NewMockUserSubject("emp-003", "emp-003"),
+				SubjectID:  "emp-003",
 				ResourceID: "api:documents:regular-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 22, 0, 0, 0, time.UTC)), // Thursday 22:00
@@ -798,7 +798,7 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 			name: "All conditions match - should allow",
 			request: &models.EvaluationRequest{
 				RequestID:  "complex-001",
-				Subject:    models.NewMockUserSubject("dev-001", "dev-001"),
+				SubjectID:  "dev-001",
 				ResourceID: "api:documents:project-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)),
@@ -820,7 +820,7 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 			name: "Time condition fails - should deny",
 			request: &models.EvaluationRequest{
 				RequestID:  "complex-002",
-				Subject:    models.NewMockUserSubject("dev-002", "dev-002"),
+				SubjectID:  "dev-002",
 				ResourceID: "api:documents:project-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 20, 0, 0, 0, time.UTC)), // After hours
@@ -842,7 +842,7 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 			name: "All basic conditions match - should allow",
 			request: &models.EvaluationRequest{
 				RequestID:  "complex-003",
-				Subject:    models.NewMockUserSubject("dev-003", "dev-003"),
+				SubjectID:  "dev-003",
 				ResourceID: "api:documents:project-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)),

@@ -129,51 +129,22 @@ type ABACService struct {
 // ABACMiddleware - Middleware để check ABAC permissions
 func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try to create Subject from request using SubjectFactory
+		// Create Subject from request using SubjectFactory
 		subject, err := service.subjectFactory.CreateFromRequest(c.Request)
 		if err != nil {
-			// Fallback to legacy X-Subject-ID header for backward compatibility
-			subjectID := c.GetHeader("X-Subject-ID")
-			if subjectID == "" {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"error":   "Missing authentication credentials",
-					"details": err.Error(),
-				})
-				c.Abort()
-				return
-			}
-
-			// Create evaluation request with legacy SubjectID
-			request := &models.EvaluationRequest{
-				RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
-				SubjectID:  subjectID,
-				ResourceID: c.Request.URL.Path,
-				Action:     requiredAction,
-				Context: map[string]interface{}{
-					"method":    c.Request.Method,
-					"timestamp": time.Now().UTC().Format(time.RFC3339),
-					"user_ip":   c.ClientIP(),
-				},
-			}
-
-			// Evaluate with PDP
-			decision, err := service.pdp.Evaluate(request)
-			if err != nil {
-				log.Printf("ABAC evaluation error: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization error"})
-				c.Abort()
-				return
-			}
-
-			service.handleDecision(c, decision, subjectID, c.Request.URL.Path, requiredAction)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error":   "Authentication required",
+				"details": err.Error(),
+				"hint":    "Please provide X-User-ID header or valid authentication token",
+			})
+			c.Abort()
 			return
 		}
 
-		// Create evaluation request with new Subject interface
+		// Create evaluation request with Subject interface
 		request := &models.EvaluationRequest{
 			RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
 			Subject:    subject,
-			SubjectID:  subject.GetID(), // For backward compatibility
 			ResourceID: c.Request.URL.Path,
 			Action:     requiredAction,
 			Context: map[string]interface{}{

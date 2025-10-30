@@ -89,7 +89,7 @@ func TestImprovedPDP_EnvironmentalContext(t *testing.T) {
 
 	request := &models.EvaluationRequest{
 		RequestID:  "env-test-001",
-		Subject:    models.NewMockUserSubject("user-456", "user-456"),
+		SubjectID:  "user-456",
 		ResourceID: "/api/financial/reports",
 		Action:     "read",
 		Environment: &models.EnvironmentInfo{
@@ -152,7 +152,7 @@ func TestImprovedPDP_StructuredAttributes(t *testing.T) {
 
 	request := &models.EvaluationRequest{
 		RequestID:  "struct-test-001",
-		Subject:    models.NewMockUserSubject("user-789", "user-789"),
+		SubjectID:  "user-789",
 		ResourceID: "/documents/confidential/project-alpha.pdf",
 		Action:     "read",
 	}
@@ -364,7 +364,7 @@ func TestImprovedPDP_PolicyFiltering(t *testing.T) {
 
 	request := &models.EvaluationRequest{
 		RequestID:  "filter-test-001",
-		Subject:    models.NewMockUserSubject("user-123", "user-123"),
+		SubjectID:  "user-123",
 		ResourceID: "api:documents:test.pdf",
 		Action:     "document:read",
 	}
@@ -457,7 +457,7 @@ func TestImprovedPDP_IntegrationWithAllFeatures(t *testing.T) {
 	// Create simple request like the passing test
 	request := &models.EvaluationRequest{
 		RequestID:  "comprehensive-test-001",
-		Subject:    models.NewMockUserSubject("user-comprehensive", "user-comprehensive"),
+		SubjectID:  "user-comprehensive",
 		ResourceID: "api:documents:test.pdf",
 		Action:     "document:read",
 		Context: map[string]interface{}{

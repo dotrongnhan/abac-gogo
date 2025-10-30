@@ -101,9 +101,19 @@ func TestPolicyValidation(t *testing.T) {
 
 func TestEvaluationRequest(t *testing.T) {
 	now := time.Now()
+
+	// Create mock subject
+	mockSubject := &User{
+		ID:       "sub-001",
+		Username: "testuser",
+		FullName: "Test User",
+		Status:   "active",
+	}
+	subject := NewUserSubject(mockSubject, nil, nil)
+
 	request := &EvaluationRequest{
 		RequestID:  "test-001",
-		SubjectID:  "sub-001",
+		Subject:    subject,
 		ResourceID: "res-001",
 		Action:     "read",
 		Timestamp:  &now, // Enhanced: explicit timestamp
@@ -129,7 +139,11 @@ func TestEvaluationRequest(t *testing.T) {
 		t.Error("Request ID should not be empty")
 	}
 
-	if request.SubjectID == "" {
+	if request.Subject == nil {
+		t.Error("Subject should not be nil")
+	}
+
+	if request.Subject.GetID() == "" {
 		t.Error("Subject ID should not be empty")
 	}
 
@@ -295,9 +309,24 @@ func TestEnvironmentInfo(t *testing.T) {
 // Test enhanced EvaluationRequest with new fields
 func TestEnhancedEvaluationRequest(t *testing.T) {
 	now := time.Now()
+
+	// Create mock subject
+	mockUser := &User{
+		ID:       "user-123",
+		Username: "john.doe",
+		FullName: "John Doe",
+		Status:   "active",
+	}
+	mockProfile := &UserProfile{
+		UserID:            "user-123",
+		SecurityClearance: "confidential",
+		AccessLevel:       5,
+	}
+	subject := NewUserSubject(mockUser, mockProfile, nil)
+
 	request := &EvaluationRequest{
 		RequestID:  "enhanced-test-001",
-		SubjectID:  "user-123",
+		Subject:    subject,
 		ResourceID: "/api/documents/confidential/project-alpha.pdf",
 		Action:     "read",
 		Timestamp:  &now,
@@ -330,8 +359,8 @@ func TestEnhancedEvaluationRequest(t *testing.T) {
 		t.Error("RequestID should not be empty")
 	}
 
-	if request.SubjectID == "" {
-		t.Error("SubjectID should not be empty")
+	if request.Subject == nil || request.Subject.GetID() == "" {
+		t.Error("Subject should not be nil and should have valid ID")
 	}
 
 	if request.ResourceID == "" {
