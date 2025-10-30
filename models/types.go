@@ -314,13 +314,15 @@ type PolicyDocument struct {
 // EvaluationRequest represents a request for policy evaluation
 type EvaluationRequest struct {
 	RequestID  string                 `json:"request_id"`
-	SubjectID  string                 `json:"subject_id"`
+	SubjectID  string                 `json:"subject_id"` // Deprecated: Use Subject instead
 	ResourceID string                 `json:"resource_id"`
 	Action     string                 `json:"action"`
 	Context    map[string]interface{} `json:"context"`
 	// Enhanced fields for improved PDP
 	Environment *EnvironmentInfo `json:"environment,omitempty"`
 	Timestamp   *time.Time       `json:"timestamp,omitempty"`
+	// New Subject interface field (preferred over SubjectID)
+	Subject SubjectInterface `json:"-"` // Not serialized to JSON
 }
 
 // EnvironmentInfo represents environmental context for basic PDP

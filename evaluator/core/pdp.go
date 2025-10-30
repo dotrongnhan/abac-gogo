@@ -51,8 +51,15 @@ func (pdp *PolicyDecisionPoint) Evaluate(request *models.EvaluationRequest) (*mo
 	if request == nil {
 		return nil, fmt.Errorf("evaluation request cannot be nil")
 	}
-	if request.SubjectID == "" || request.ResourceID == "" || request.Action == "" {
-		return nil, fmt.Errorf("invalid request: missing required fields (SubjectID, ResourceID, Action)")
+
+	// Support both new Subject interface and legacy SubjectID
+	subjectID := request.SubjectID
+	if request.Subject != nil {
+		subjectID = request.Subject.GetID()
+	}
+
+	if subjectID == "" || request.ResourceID == "" || request.Action == "" {
+		return nil, fmt.Errorf("invalid request: missing required fields (SubjectID/Subject, ResourceID, Action)")
 	}
 
 	// Step 1: Enrich context with all necessary attributes
@@ -179,22 +186,21 @@ func (pdp *PolicyDecisionPoint) addEnvironmentalContext(evalContext map[string]i
 
 // addStructuredSubjectAttributes adds structured subject attributes (improvement #6)
 func (pdp *PolicyDecisionPoint) addStructuredSubjectAttributes(evalContext map[string]interface{}, context *models.EvaluationContext) {
-	if context.Subject == nil {
-		return
-	}
+	// Support both legacy Subject and new SubjectInterface
+	if context.Subject != nil {
+		// Legacy subject handling
+		for key, value := range context.Subject.Attributes {
+			evalContext[constants.ContextKeyUserPrefix+key] = value
+		}
+		evalContext[constants.ContextKeyUserPrefix+"SubjectType"] = context.Subject.SubjectType
 
-	// Flat attributes for backward compatibility
-	for key, value := range context.Subject.Attributes {
-		evalContext[constants.ContextKeyUserPrefix+key] = value
+		// Structured attributes for enhanced access
+		userContext := map[string]interface{}{
+			"subject_type": context.Subject.SubjectType,
+			"attributes":   map[string]interface{}(context.Subject.Attributes),
+		}
+		evalContext["user"] = userContext
 	}
-	evalContext[constants.ContextKeyUserPrefix+"SubjectType"] = context.Subject.SubjectType
-
-	// Structured attributes for enhanced access
-	userContext := map[string]interface{}{
-		"subject_type": context.Subject.SubjectType,
-		"attributes":   map[string]interface{}(context.Subject.Attributes),
-	}
-	evalContext["user"] = userContext
 }
 
 // addStructuredResourceAttributes adds structured resource attributes (improvement #6)

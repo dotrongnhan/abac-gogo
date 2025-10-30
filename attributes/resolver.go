@@ -32,8 +32,9 @@ func (r *AttributeResolver) validateRequest(request *models.EvaluationRequest) e
 		return fmt.Errorf("evaluation request cannot be nil")
 	}
 
-	if request.SubjectID == "" {
-		return fmt.Errorf("subject ID cannot be empty")
+	// Support both new Subject interface and legacy SubjectID
+	if request.Subject == nil && request.SubjectID == "" {
+		return fmt.Errorf("subject ID or Subject interface must be provided")
 	}
 
 	if request.ResourceID == "" {
@@ -53,13 +54,32 @@ func (r *AttributeResolver) EnrichContext(request *models.EvaluationRequest) (*m
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}
 
-	// Get subject
-	subject, err := r.storage.GetSubject(request.SubjectID)
+	// Determine subject ID from either Subject interface or legacy SubjectID
+	subjectID := request.SubjectID
+	if request.Subject != nil {
+		subjectID = request.Subject.GetID()
+	}
+
+	// Get subject (legacy - will be deprecated)
+	subject, err := r.storage.GetSubject(subjectID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve subject '%s': %w", request.SubjectID, err)
+		return nil, fmt.Errorf("failed to retrieve subject '%s': %w", subjectID, err)
 	}
 	if subject == nil {
-		return nil, fmt.Errorf("subject '%s' not found", request.SubjectID)
+		return nil, fmt.Errorf("subject '%s' not found", subjectID)
+	}
+
+	// If using new Subject interface, merge attributes
+	if request.Subject != nil {
+		// Use attributes from SubjectInterface
+		subjectAttrs := request.Subject.GetAttributes()
+		if subject.Attributes == nil {
+			subject.Attributes = make(map[string]interface{})
+		}
+		// Merge new attributes with legacy attributes
+		for key, value := range subjectAttrs {
+			subject.Attributes[key] = value
+		}
 	}
 
 	// Get resource

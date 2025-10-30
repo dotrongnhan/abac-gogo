@@ -11,7 +11,8 @@ import (
 
 // PostgreSQLStorage implements Storage interface using PostgreSQL with GORM
 type PostgreSQLStorage struct {
-	db *gorm.DB
+	db             *gorm.DB
+	userRepository *UserRepository
 }
 
 // NewPostgreSQLStorage creates a new PostgreSQL storage instance
@@ -22,7 +23,8 @@ func NewPostgreSQLStorage(config *DatabaseConfig) (*PostgreSQLStorage, error) {
 	}
 
 	storage := &PostgreSQLStorage{
-		db: db,
+		db:             db,
+		userRepository: NewUserRepository(db),
 	}
 
 	// Auto-migrate the schema
@@ -36,11 +38,21 @@ func NewPostgreSQLStorage(config *DatabaseConfig) (*PostgreSQLStorage, error) {
 // migrate runs database migrations
 func (s *PostgreSQLStorage) migrate() error {
 	return s.db.AutoMigrate(
+		// Legacy ABAC models
 		&models.Subject{},
 		&models.Resource{},
 		&models.Action{},
 		&models.Policy{},
 		&models.AuditLog{},
+		// User-based ABAC models
+		&models.Company{},
+		&models.Department{},
+		&models.Position{},
+		&models.Role{},
+		&models.User{},
+		&models.UserProfile{},
+		&models.UserRole{},
+		&models.UserAttributeHistory{},
 	)
 }
 
@@ -257,4 +269,101 @@ func (s *PostgreSQLStorage) Close() error {
 		return fmt.Errorf("failed to get underlying sql.DB: %w", err)
 	}
 	return sqlDB.Close()
+}
+
+// User-based ABAC methods
+
+// GetUser retrieves a user by ID
+func (s *PostgreSQLStorage) GetUser(id string) (*models.User, error) {
+	return s.userRepository.GetUserByID(id)
+}
+
+// GetUserWithRelations retrieves a user with all related data
+func (s *PostgreSQLStorage) GetUserWithRelations(id string) (*models.User, error) {
+	return s.userRepository.GetUserWithRelations(id)
+}
+
+// GetUserProfile retrieves the profile for a specific user
+func (s *PostgreSQLStorage) GetUserProfile(userID string) (*models.UserProfile, error) {
+	return s.userRepository.GetUserProfile(userID)
+}
+
+// GetUserRoles retrieves all active roles for a user
+func (s *PostgreSQLStorage) GetUserRoles(userID string) ([]models.Role, error) {
+	return s.userRepository.GetUserRoles(userID)
+}
+
+// GetUserAttributes builds ABAC attributes from user data
+func (s *PostgreSQLStorage) GetUserAttributes(userID string) (map[string]interface{}, error) {
+	return s.userRepository.GetUserAttributes(userID)
+}
+
+// BuildSubjectFromUser creates a SubjectInterface from a user ID
+func (s *PostgreSQLStorage) BuildSubjectFromUser(userID string) (models.SubjectInterface, error) {
+	user, err := s.userRepository.GetUserWithRelations(userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user with relations: %w", err)
+	}
+
+	var profile *models.UserProfile
+	var roles []models.Role
+
+	if user.Profile != nil {
+		profile = user.Profile
+	}
+	if len(user.Roles) > 0 {
+		roles = user.Roles
+	}
+
+	userSubject := models.NewUserSubject(user, profile, roles)
+	if userSubject == nil {
+		return nil, fmt.Errorf("failed to create user subject")
+	}
+
+	return userSubject, nil
+}
+
+// GetAllUsers retrieves all users with optional filters
+func (s *PostgreSQLStorage) GetAllUsers(status string, limit, offset int) ([]*models.User, error) {
+	return s.userRepository.GetAllUsers(status, limit, offset)
+}
+
+// CreateUser creates a new user
+func (s *PostgreSQLStorage) CreateUser(user *models.User) error {
+	return s.userRepository.CreateUser(user)
+}
+
+// CreateUserProfile creates a new user profile
+func (s *PostgreSQLStorage) CreateUserProfile(profile *models.UserProfile) error {
+	return s.userRepository.CreateUserProfile(profile)
+}
+
+// UpdateUser updates an existing user
+func (s *PostgreSQLStorage) UpdateUser(user *models.User) error {
+	return s.userRepository.UpdateUser(user)
+}
+
+// UpdateUserProfile updates an existing user profile
+func (s *PostgreSQLStorage) UpdateUserProfile(profile *models.UserProfile) error {
+	return s.userRepository.UpdateUserProfile(profile)
+}
+
+// DeleteUser deletes a user by ID
+func (s *PostgreSQLStorage) DeleteUser(id string) error {
+	return s.userRepository.DeleteUser(id)
+}
+
+// AssignRole assigns a role to a user
+func (s *PostgreSQLStorage) AssignRole(userID, roleID, assignedBy string) error {
+	return s.userRepository.AssignRole(userID, roleID, assignedBy)
+}
+
+// RevokeRole revokes a role from a user
+func (s *PostgreSQLStorage) RevokeRole(userID, roleID string) error {
+	return s.userRepository.RevokeRole(userID, roleID)
+}
+
+// GetRoleByCode retrieves a role by its code
+func (s *PostgreSQLStorage) GetRoleByCode(code string) (*models.Role, error) {
+	return s.userRepository.GetRoleByCode(code)
 }

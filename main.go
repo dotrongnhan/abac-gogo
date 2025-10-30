@@ -23,19 +23,25 @@ func main() {
 
 	// Khởi tạo PostgreSQL storage
 	dbConfig := storage.DefaultDatabaseConfig()
-	storage, err := storage.NewPostgreSQLStorage(dbConfig)
+	storageInstance, err := storage.NewPostgreSQLStorage(dbConfig)
 	if err != nil {
 		log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
 	}
-	defer storage.Close()
+	defer storageInstance.Close()
 
 	// Khởi tạo PDP
-	pdp := core.NewPolicyDecisionPoint(storage)
+	pdp := core.NewPolicyDecisionPoint(storageInstance)
+
+	// Khởi tạo SubjectFactory với loaders
+	userLoader := storage.NewStorageUserLoader(storageInstance)
+	serviceLoader := storage.NewStorageServiceLoader(storageInstance)
+	subjectFactory := models.NewSubjectFactory(userLoader, serviceLoader)
 
 	// Khởi tạo service
 	service := &ABACService{
-		pdp:     pdp,
-		storage: storage,
+		pdp:            pdp,
+		storage:        storageInstance,
+		subjectFactory: subjectFactory,
 	}
 
 	// Setup Gin router
@@ -115,25 +121,59 @@ func main() {
 
 // ABACService - HTTP service với ABAC authorization
 type ABACService struct {
-	pdp     core.PolicyDecisionPointInterface
-	storage storage.Storage
+	pdp            core.PolicyDecisionPointInterface
+	storage        storage.Storage
+	subjectFactory *models.SubjectFactory
 }
 
 // ABACMiddleware - Middleware để check ABAC permissions
 func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Lấy subject từ header (trong thực tế sẽ từ JWT token)
-		subjectID := c.GetHeader("X-Subject-ID")
-		if subjectID == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing X-Subject-ID header"})
-			c.Abort()
+		// Try to create Subject from request using SubjectFactory
+		subject, err := service.subjectFactory.CreateFromRequest(c.Request)
+		if err != nil {
+			// Fallback to legacy X-Subject-ID header for backward compatibility
+			subjectID := c.GetHeader("X-Subject-ID")
+			if subjectID == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error":   "Missing authentication credentials",
+					"details": err.Error(),
+				})
+				c.Abort()
+				return
+			}
+
+			// Create evaluation request with legacy SubjectID
+			request := &models.EvaluationRequest{
+				RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
+				SubjectID:  subjectID,
+				ResourceID: c.Request.URL.Path,
+				Action:     requiredAction,
+				Context: map[string]interface{}{
+					"method":    c.Request.Method,
+					"timestamp": time.Now().UTC().Format(time.RFC3339),
+					"user_ip":   c.ClientIP(),
+				},
+			}
+
+			// Evaluate with PDP
+			decision, err := service.pdp.Evaluate(request)
+			if err != nil {
+				log.Printf("ABAC evaluation error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization error"})
+				c.Abort()
+				return
+			}
+
+			service.handleDecision(c, decision, subjectID, c.Request.URL.Path, requiredAction)
 			return
 		}
 
-		// Tạo evaluation request
+		// Create evaluation request with new Subject interface
 		request := &models.EvaluationRequest{
 			RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
-			SubjectID:  subjectID,
+			Subject:    subject,
+			SubjectID:  subject.GetID(), // For backward compatibility
 			ResourceID: c.Request.URL.Path,
 			Action:     requiredAction,
 			Context: map[string]interface{}{
@@ -143,7 +183,7 @@ func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFun
 			},
 		}
 
-		// Kiểm tra quyền với PDP
+		// Evaluate with PDP
 		decision, err := service.pdp.Evaluate(request)
 		if err != nil {
 			log.Printf("ABAC evaluation error: %v", err)
@@ -152,26 +192,31 @@ func (service *ABACService) ABACMiddleware(requiredAction string) gin.HandlerFun
 			return
 		}
 
-		// Log decision
-		log.Printf("ABAC Decision: %s - Subject: %s, Resource: %s, Action: %s, Reason: %s",
-			decision.Result, subjectID, c.Request.URL.Path, requiredAction, decision.Reason)
-
-		// Kiểm tra kết quả
-		if decision.Result != "permit" {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error":    "Access denied",
-				"reason":   decision.Reason,
-				"subject":  subjectID,
-				"resource": c.Request.URL.Path,
-				"action":   requiredAction,
-			})
-			c.Abort()
-			return
-		}
-
-		// Cho phép request tiếp tục
-		c.Next()
+		service.handleDecision(c, decision, subject.GetID(), c.Request.URL.Path, requiredAction)
 	}
+}
+
+// handleDecision processes the PDP decision
+func (service *ABACService) handleDecision(c *gin.Context, decision *models.Decision, subjectID, resource, action string) {
+	// Log decision
+	log.Printf("ABAC Decision: %s - Subject: %s, Resource: %s, Action: %s, Reason: %s",
+		decision.Result, subjectID, resource, action, decision.Reason)
+
+	// Check result
+	if decision.Result != "permit" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":    "Access denied",
+			"reason":   decision.Reason,
+			"subject":  subjectID,
+			"resource": resource,
+			"action":   action,
+		})
+		c.Abort()
+		return
+	}
+
+	// Allow request to continue
+	c.Next()
 }
 
 // API Handlers

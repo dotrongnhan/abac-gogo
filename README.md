@@ -2,6 +2,8 @@
 
 A comprehensive **Attribute-Based Access Control (ABAC)** system implemented in Go 1.23+, featuring advanced policy evaluation, PostgreSQL storage, HTTP service integration, and enterprise-grade security controls.
 
+> **🆕 NEW: User-Based ABAC Architecture** - The system now supports structured user attributes with relational data models (users, departments, positions, roles) while maintaining backward compatibility with the legacy subject model.
+
 ## ✨ Key Features
 
 - **🎯 Advanced Policy Decision Point (PDP)**: Enhanced condition evaluation with 20+ operators
@@ -11,6 +13,9 @@ A comprehensive **Attribute-Based Access Control (ABAC)** system implemented in 
 - **🔍 Comprehensive Audit**: Detailed logging and compliance tracking
 - **⚡ High Performance**: Optimized evaluation with caching and pre-filtering
 - **🧪 Extensive Testing**: 85%+ test coverage with integration and benchmark tests
+- **👥 User-Based Attributes**: Structured relational data for users, departments, positions, and roles
+- **🔌 Subject Abstraction**: Flexible subject interface supporting users, services, and API keys
+- **🔄 Backward Compatible**: Legacy subject model still supported for smooth migration
 
 ## 🏗️ Architecture Overview
 
@@ -56,6 +61,168 @@ abac_go_example/
 └── docs/                       # Consolidated documentation guides
 ```
 
+## 👥 User-Based ABAC Architecture
+
+### Overview
+
+The system has been refactored from a flat JSONB-based subject model to a structured relational user model:
+
+```
+┌─────────────────────────────────────────┐
+│         Subject Interface               │
+│  - GetID()                              │
+│  - GetType()                            │
+│  - GetAttributes()                      │
+│  - GetDisplayName()                     │
+│  - IsActive()                           │
+└─────────────────────────────────────────┘
+                    ▲
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+┌───────────────┐      ┌────────────────┐
+│ UserSubject   │      │ ServiceSubject │
+│               │      │                │
+│ - User        │      │ - ServiceName  │
+│ - Profile     │      │ - Namespace    │
+│ - Department  │      │ - Scopes       │
+│ - Position    │      └────────────────┘
+│ - Roles       │
+└───────────────┘
+        │
+        │ maps to
+        ▼
+┌─────────────────────────────────────────┐
+│  ABAC Attributes (flat map)             │
+│  {                                      │
+│    "user_id": "user-001",               │
+│    "department_code": "ENG",            │
+│    "position_level": 5,                 │
+│    "roles": ["developer", "reviewer"],  │
+│    "clearance": "confidential"          │
+│  }                                      │
+└─────────────────────────────────────────┘
+```
+
+### Database Schema
+
+```
+users (id, username, email, full_name, status)
+  ↓ 1:1
+user_profiles (user_id, company_id, department_id, position_id, manager_id, location)
+  ↓ N:1          ↓ N:1           ↓ N:1
+companies    departments      positions
+             ↓ N:1
+         companies
+
+users ←N:M→ roles (through user_roles)
+```
+
+### Key Components
+
+#### 1. Subject Interface (`models/subject_interface.go`)
+- Abstraction layer for all subject types
+- Enables polymorphic handling of users, services, and API keys
+- Provides consistent `GetAttributes()` method for PDP evaluation
+
+#### 2. UserSubject (`models/user_subject.go`)
+- Implements `SubjectInterface` for user-based authentication
+- Maps relational user data to flat ABAC attributes
+- Provides helper methods: `HasRole()`, `HasAnyRole()`, `HasAllRoles()`
+
+#### 3. ServiceSubject (`models/service_subject.go`)
+- Implements `SubjectInterface` for service-to-service authentication
+- Supports scopes and namespaces for multi-tenant architectures
+- Placeholder for future API key and service account features
+
+#### 4. SubjectFactory (`models/subject_factory.go`)
+- Factory pattern for creating subjects from various sources
+- Detects authentication type from HTTP headers
+- Supports: X-User-ID, X-Subject-ID (legacy), JWT tokens, API keys
+
+### User Attributes Mapping
+
+UserSubject automatically maps relational data to flat attributes:
+
+| Relational Data | ABAC Attribute Key | Example Value |
+|----------------|-------------------|---------------|
+| User.ID | `user_id` | "user-001" |
+| User.Username | `username` | "john.doe" |
+| User.Status | `status` | "active" |
+| Profile.Company.CompanyCode | `company_code` | "TECH-001" |
+| Profile.Department.DepartmentCode | `department_code` | "ENG" |
+| Profile.Position.PositionLevel | `position_level` | 5 |
+| Profile.SecurityClearance | `clearance` | "confidential" |
+| Roles[].RoleCode | `roles` | ["developer", "reviewer"] |
+
+### Migration Path
+
+**Phase 1: Dual Support (Current)**
+- Both legacy Subject and new User models coexist
+- PDP accepts both `SubjectID` (string) and `Subject` (interface)
+- Middleware tries new authentication first, falls back to legacy
+
+**Phase 2: Gradual Migration**
+- Update client applications to use X-User-ID header
+- Migrate data from `subjects` table to `users` + related tables
+- Update policies to use new attribute keys
+
+**Phase 3: Deprecation**
+- Remove legacy Subject model support
+- Clean up backward compatibility code
+- Update all documentation
+
+### Usage Examples
+
+#### Authentication Headers
+
+```bash
+# New user-based authentication
+curl -H "X-User-ID: user-001" http://localhost:8081/api/v1/users
+
+# Legacy subject authentication (backward compatible)
+curl -H "X-Subject-ID: sub-001" http://localhost:8081/api/v1/users
+
+# Future: JWT token authentication
+curl -H "Authorization: Bearer <jwt-token>" http://localhost:8081/api/v1/users
+```
+
+#### Policy Examples with User Attributes
+
+```json
+{
+  "Sid": "AllowDeveloperAPIRead",
+  "Effect": "Allow",
+  "Action": "read",
+  "Resource": "/api/v1/*",
+  "Condition": {
+    "StringEquals": {
+      "user.roles": "developer"
+    },
+    "NumericGreaterThanEquals": {
+      "user.position_level": 3
+    }
+  }
+}
+```
+
+```json
+{
+  "Sid": "AllowFinanceDepartment",
+  "Effect": "Allow",
+  "Action": ["read", "write"],
+  "Resource": "/api/v1/financial*",
+  "Condition": {
+    "StringEquals": {
+      "user.department_code": "FINANCE"
+    },
+    "StringIn": {
+      "user.clearance": ["secret", "top_secret"]
+    }
+  }
+}
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -75,9 +242,17 @@ docker-compose up -d
 # Or create database manually
 createdb abac_db
 
-# Install dependencies and migrate
+# Install dependencies
 go mod tidy
+
+# Run migrations (includes user schema)
 go run cmd/migrate/main.go
+
+# Apply user schema migration
+psql -d abac_db -f migrations/002_user_schema.sql
+
+# Load seed data
+psql -d abac_db -f migrations/003_user_seed_data.sql
 
 # Start HTTP service
 go run main.go
