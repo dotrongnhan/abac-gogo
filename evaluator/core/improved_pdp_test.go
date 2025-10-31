@@ -11,7 +11,7 @@ import (
 // TestImprovedPDP_TimeBasedAttributes tests improvement #4: Time-based attributes
 func TestImprovedPDP_TimeBasedAttributes(t *testing.T) {
 	// Create mock storage
-	mockStorage := &storage.MockStorage{}
+	mockStorage := storage.NewMockStorage()
 
 	// Create improved PDP
 	pdp := NewPolicyDecisionPoint(mockStorage).(*PolicyDecisionPoint)
@@ -84,7 +84,7 @@ func TestImprovedPDP_TimeBasedAttributes(t *testing.T) {
 
 // TestImprovedPDP_EnvironmentalContext tests improvement #5: Environmental context
 func TestImprovedPDP_EnvironmentalContext(t *testing.T) {
-	mockStorage := &storage.MockStorage{}
+	mockStorage := storage.NewMockStorage()
 	pdp := NewPolicyDecisionPoint(mockStorage).(*PolicyDecisionPoint)
 
 	request := &models.EvaluationRequest{
@@ -147,7 +147,7 @@ func TestImprovedPDP_EnvironmentalContext(t *testing.T) {
 
 // TestImprovedPDP_StructuredAttributes tests improvement #6: Structured attributes
 func TestImprovedPDP_StructuredAttributes(t *testing.T) {
-	mockStorage := &storage.MockStorage{}
+	mockStorage := storage.NewMockStorage()
 	pdp := NewPolicyDecisionPoint(mockStorage).(*PolicyDecisionPoint)
 
 	request := &models.EvaluationRequest{
@@ -228,7 +228,7 @@ func TestImprovedPDP_StructuredAttributes(t *testing.T) {
 
 // TestImprovedPDP_EnhancedConditionEvaluation tests improvement #7: Enhanced condition evaluator
 func TestImprovedPDP_EnhancedConditionEvaluation(t *testing.T) {
-	mockStorage := &storage.MockStorage{}
+	mockStorage := storage.NewMockStorage()
 	pdp := NewPolicyDecisionPoint(mockStorage).(*PolicyDecisionPoint)
 
 	// Test that enhanced condition evaluator is used
@@ -456,8 +456,12 @@ func TestImprovedPDP_IntegrationWithAllFeatures(t *testing.T) {
 
 	// Create simple request like the passing test
 	request := &models.EvaluationRequest{
-		RequestID:  "comprehensive-test-001",
-		Subject:    models.NewMockUserSubject("user-comprehensive", "user-comprehensive"),
+		RequestID: "comprehensive-test-001",
+		Subject: models.CreateMockSubjectWithAttributes("user-comprehensive", map[string]interface{}{
+			"department": "Engineering",
+			"level":      8,
+			"clearance":  "confidential",
+		}),
 		ResourceID: "api:documents:test.pdf",
 		Action:     "document:read",
 		Context: map[string]interface{}{

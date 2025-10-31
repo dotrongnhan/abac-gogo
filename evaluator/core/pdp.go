@@ -185,17 +185,26 @@ func (pdp *PolicyDecisionPoint) addEnvironmentalContext(evalContext map[string]i
 func (pdp *PolicyDecisionPoint) addStructuredSubjectAttributes(evalContext map[string]interface{}, context *models.EvaluationContext) {
 	// Support both legacy Subject and new SubjectInterface
 	if context.Subject != nil {
-		// Legacy subject handling
+		// Legacy flat attribute handling for backward compatibility
 		for key, value := range context.Subject.Attributes {
 			evalContext[constants.ContextKeyUserPrefix+key] = value
 		}
 		evalContext[constants.ContextKeyUserPrefix+"SubjectType"] = context.Subject.SubjectType
+		evalContext[constants.ContextKeyUserPrefix+"subject_type"] = context.Subject.SubjectType
 
 		// Structured attributes for enhanced access
+		// Create user context with both nested and flat attributes
 		userContext := map[string]interface{}{
 			"subject_type": context.Subject.SubjectType,
 			"attributes":   map[string]interface{}(context.Subject.Attributes),
 		}
+
+		// Also add flat attributes directly to user context for easier access
+		// This allows conditions like "user.department" instead of "user.attributes.department"
+		for key, value := range context.Subject.Attributes {
+			userContext[key] = value
+		}
+
 		evalContext["user"] = userContext
 	}
 }
@@ -219,6 +228,13 @@ func (pdp *PolicyDecisionPoint) addStructuredResourceAttributes(evalContext map[
 		"resource_id":   context.Resource.ResourceID,
 		"attributes":    map[string]interface{}(context.Resource.Attributes),
 	}
+
+	// Also add flat attributes directly to resource context for easier access
+	// This allows conditions like "resource.classification" instead of "resource.attributes.classification"
+	for key, value := range context.Resource.Attributes {
+		resourceContext[key] = value
+	}
+
 	evalContext["resource"] = resourceContext
 }
 

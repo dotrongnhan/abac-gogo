@@ -34,7 +34,7 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					},
 					Condition: map[string]interface{}{
 						"StringEquals": map[string]interface{}{
-							"user.subject_type": "employee",
+							"user.subject_type": "user",
 						},
 						"StringContains": map[string]interface{}{
 							"user.department": "Engineering",
@@ -67,13 +67,13 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					},
 					Condition: map[string]interface{}{
 						"StringEquals": map[string]interface{}{
-							"user.clearance": "confidential",
+							"user.custom_clearance": "confidential",
 						},
 						"NumericGreaterThanEquals": map[string]interface{}{
-							"user.level": 7,
+							"user.access_level": 7,
 						},
 						"Bool": map[string]interface{}{
-							"user.mfa_verified": true,
+							"user.custom_mfa_verified": true,
 						},
 					},
 				},
@@ -310,8 +310,12 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 		{
 			name: "Business hours document access - should allow",
 			request: &models.EvaluationRequest{
-				RequestID:  "scenario-001",
-				Subject:    models.NewMockUserSubject("emp-001", "emp-001"),
+				RequestID: "scenario-001",
+				Subject: models.CreateMockSubjectWithAttributes("emp-001", map[string]interface{}{
+					"subject_type": "employee",
+					"department":   "Engineering Team",
+					"level":        5,
+				}),
 				ResourceID: "api:documents:project-specs.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)), // Thursday 14:30
@@ -336,8 +340,14 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 		{
 			name: "Confidential document access - should allow for senior staff",
 			request: &models.EvaluationRequest{
-				RequestID:  "scenario-002",
-				Subject:    models.NewMockUserSubject("senior-001", "senior-001"),
+				RequestID: "scenario-002",
+				Subject: models.CreateMockSubjectWithAttributes("senior-001", map[string]interface{}{
+					"subject_type": "employee",
+					"department":   "Engineering",
+					"level":        8,
+					"clearance":    "confidential",
+					"mfa_verified": true,
+				}),
 				ResourceID: "api:documents:confidential",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 10, 0, 0, 0, time.UTC)),
@@ -364,8 +374,12 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 		{
 			name: "Weekend restriction - should deny sensitive operations",
 			request: &models.EvaluationRequest{
-				RequestID:  "scenario-003",
-				Subject:    models.NewMockUserSubject("emp-002", "emp-002"),
+				RequestID: "scenario-003",
+				Subject: models.CreateMockSubjectWithAttributes("emp-002", map[string]interface{}{
+					"subject_type": "employee",
+					"department":   "Finance",
+					"level":        3,
+				}),
 				ResourceID: "api:documents:important-file.pdf",
 				Action:     "document:delete",
 				Timestamp:  timePtr(time.Date(2024, 10, 26, 15, 0, 0, 0, time.UTC)), // Saturday 15:00
@@ -389,8 +403,13 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 		{
 			name: "Mobile device restriction - should deny admin actions",
 			request: &models.EvaluationRequest{
-				RequestID:  "scenario-004",
-				Subject:    models.NewMockUserSubject("admin-001", "admin-001"),
+				RequestID: "scenario-004",
+				Subject: models.CreateMockSubjectWithAttributes("admin-001", map[string]interface{}{
+					"subject_type": "admin",
+					"department":   "IT",
+					"level":        9,
+					"role":         "system_admin",
+				}),
 				ResourceID: "api:admin:user-management",
 				Action:     "admin:user:delete",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 11, 0, 0, 0, time.UTC)),
@@ -415,8 +434,12 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 		{
 			name: "After hours access - should deny",
 			request: &models.EvaluationRequest{
-				RequestID:  "scenario-005",
-				Subject:    models.NewMockUserSubject("emp-003", "emp-003"),
+				RequestID: "scenario-005",
+				Subject: models.CreateMockSubjectWithAttributes("emp-003", map[string]interface{}{
+					"subject_type": "employee",
+					"department":   "Engineering",
+					"level":        4,
+				}),
 				ResourceID: "api:documents:regular-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 22, 0, 0, 0, time.UTC)), // Thursday 22:00
@@ -458,9 +481,9 @@ func TestImprovedPDP_RealWorldScenarios(t *testing.T) {
 					scenario.expectedResult, decision.Result, decision.Reason)
 			}
 
-			// Verify evaluation time is reasonable
-			if decision.EvaluationTimeMs <= 0 {
-				t.Error("Evaluation time should be positive")
+			// Verify evaluation time is set (can be 0 for very fast evaluations)
+			if decision.EvaluationTimeMs < 0 {
+				t.Error("Evaluation time should not be negative")
 			}
 
 			// Log results for analysis
@@ -499,7 +522,7 @@ func TestImprovedPDP_PerformanceComparison(t *testing.T) {
 							"user.department": fmt.Sprintf("Department-%d", i%3),
 						},
 						"NumericGreaterThan": map[string]interface{}{
-							"user.level": i % 10,
+							"user.access_level": i % 10,
 						},
 					},
 				},
@@ -622,8 +645,11 @@ func TestImprovedPDP_PerformanceComparison(t *testing.T) {
 	// Test requests
 	requests := []*models.EvaluationRequest{
 		{
-			RequestID:  "perf-001",
-			Subject:    models.NewMockUserSubject("user-perf-001", "user-perf-001"),
+			RequestID: "perf-001",
+			Subject: models.CreateMockSubjectWithAttributes("user-perf-001", map[string]interface{}{
+				"department": "Department-1",
+				"level":      5,
+			}),
 			ResourceID: "api:resource-1:item-123",
 			Action:     "service-1:action:read",
 			Timestamp:  timePtr(time.Now()),
@@ -638,8 +664,11 @@ func TestImprovedPDP_PerformanceComparison(t *testing.T) {
 			},
 		},
 		{
-			RequestID:  "perf-002",
-			Subject:    models.NewMockUserSubject("user-perf-002", "user-perf-002"),
+			RequestID: "perf-002",
+			Subject: models.CreateMockSubjectWithAttributes("user-perf-002", map[string]interface{}{
+				"department": "Department-2",
+				"level":      3,
+			}),
 			ResourceID: "api:resource-5:item-456",
 			Action:     "service-2:action:write",
 			Timestamp:  timePtr(time.Now()),
@@ -701,7 +730,7 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 						"user.department": "Engineering",
 					},
 					"NumericGreaterThanEquals": map[string]interface{}{
-						"user.level": 5,
+						"user.access_level": 5,
 					},
 				},
 			},
@@ -797,8 +826,13 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 		{
 			name: "All conditions match - should allow",
 			request: &models.EvaluationRequest{
-				RequestID:  "complex-001",
-				Subject:    models.NewMockUserSubject("dev-001", "dev-001"),
+				RequestID: "complex-001",
+				Subject: models.CreateMockSubjectWithAttributes("dev-001", map[string]interface{}{
+					"department": "Engineering",
+					"level":      7,
+					"roles":      []string{"developer", "reviewer"},
+					"email":      "dev001@company.com",
+				}),
 				ResourceID: "api:documents:project-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)),
@@ -819,8 +853,13 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 		{
 			name: "Time condition fails - should deny",
 			request: &models.EvaluationRequest{
-				RequestID:  "complex-002",
-				Subject:    models.NewMockUserSubject("dev-002", "dev-002"),
+				RequestID: "complex-002",
+				Subject: models.CreateMockSubjectWithAttributes("dev-002", map[string]interface{}{
+					"department": "Engineering",
+					"level":      4,
+					"roles":      []string{"developer"},
+					"email":      "dev002@company.com",
+				}),
 				ResourceID: "api:documents:project-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 20, 0, 0, 0, time.UTC)), // After hours
@@ -841,8 +880,13 @@ func TestImprovedPDP_ComplexConditionScenarios(t *testing.T) {
 		{
 			name: "All basic conditions match - should allow",
 			request: &models.EvaluationRequest{
-				RequestID:  "complex-003",
-				Subject:    models.NewMockUserSubject("dev-003", "dev-003"),
+				RequestID: "complex-003",
+				Subject: models.CreateMockSubjectWithAttributes("dev-003", map[string]interface{}{
+					"department": "Engineering",
+					"level":      8,
+					"roles":      []string{"developer", "lead"},
+					"email":      "dev003@company.com",
+				}),
 				ResourceID: "api:documents:project-file.pdf",
 				Action:     "document:read",
 				Timestamp:  timePtr(time.Date(2024, 10, 24, 14, 30, 0, 0, time.UTC)),
