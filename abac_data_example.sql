@@ -64,14 +64,12 @@ CREATE TABLE policies (
                           policy_name VARCHAR(255) UNIQUE NOT NULL,
                           description TEXT,
                           effect VARCHAR(10) NOT NULL CHECK (effect IN ('permit', 'deny')),
-                          priority INTEGER DEFAULT 100,
                           enabled BOOLEAN DEFAULT true,
                           conditions JSONB DEFAULT '{}', -- complex conditions in JSON
                           parent_policy_id UUID REFERENCES policies(id),
                           version INTEGER DEFAULT 1,
                           created_at TIMESTAMP DEFAULT NOW(),
                           updated_at TIMESTAMP DEFAULT NOW(),
-                          INDEX idx_policy_priority (priority, enabled),
                           INDEX idx_policy_parent (parent_policy_id)
 );
 

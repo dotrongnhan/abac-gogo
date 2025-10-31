@@ -202,7 +202,6 @@ type Policy struct {
     PolicyName       string                 `json:"policy_name"`      // Human-readable name
     Description      string                 `json:"description"`      // Policy purpose
     Effect           string                 `json:"effect"`           // "permit" | "deny"
-    Priority         int                    `json:"priority"`         // Evaluation order
     Enabled          bool                   `json:"enabled"`          // Active status
     Version          int                    `json:"version"`          // Version control
     Conditions       map[string]interface{} `json:"conditions"`       // Legacy conditions
@@ -217,20 +216,18 @@ type Policy struct {
 **Field Chi Tiết:**
 
 - **Effect**: `permit` (allow access) hoặc `deny` (block access)
-- **Priority**: Lower number = higher priority (1-1000)
 - **Rules**: Array of conditions, tất cả phải match (AND logic)
 - **Actions**: Whitelist of applicable actions (`["read", "write"]` hoặc `["*"]`)
 - **ResourcePatterns**: Wildcard patterns cho resource matching
 
 **Policy Effects:**
 - `permit`: Grant access nếu tất cả rules match
-- `deny`: Block access nếu tất cả rules match (override permit)
+- `deny`: Block access nếu tất cả rules match (Deny-Override algorithm)
 
-**Priority Ranges:**
-- `1-10`: Critical deny policies (security violations)
-- `11-50`: High priority policies (role-based access)
-- `51-100`: Standard policies (department access)
-- `101-1000`: Low priority policies (default permissions)
+**Evaluation Algorithm:**
+- Uses **Deny-Override**: Any deny immediately results in deny decision
+- No priority field needed - policies evaluated in database order
+- Deny always wins over permit
 
 ### 5. PolicyRule Model
 

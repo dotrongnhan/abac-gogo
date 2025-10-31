@@ -98,7 +98,7 @@ func (s *PostgreSQLStorage) GetAction(name string) (*models.Action, error) {
 // GetPolicies retrieves all policies
 func (s *PostgreSQLStorage) GetPolicies() ([]*models.Policy, error) {
 	var policies []*models.Policy
-	result := s.db.Where("enabled = ?", true).Order("priority DESC").Find(&policies)
+	result := s.db.Where("enabled = ?", true).Find(&policies)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get policies: %w", result.Error)
 	}

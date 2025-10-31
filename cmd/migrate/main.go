@@ -205,7 +205,6 @@ func seedPolicies(storage *storage.PostgreSQLStorage, filename string) error {
 			PolicyName       string                 `json:"policy_name"`
 			Description      string                 `json:"description"`
 			Effect           string                 `json:"effect"`
-			Priority         int                    `json:"priority"`
 			Enabled          bool                   `json:"enabled"`
 			Version          int                    `json:"version"`
 			Conditions       map[string]interface{} `json:"conditions"`

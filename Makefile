@@ -47,6 +47,7 @@ migrate: setup-db
 	@echo "🔄 Running database migration and seeding..."
 	@go run cmd/migrate/main.go
 
+
 # Testing
 deps:
 	@echo "📦 Installing dependencies..."

@@ -441,7 +441,6 @@ type Policy struct {
     ID               string          `gorm:"primaryKey"`
     PolicyName       string          `gorm:"index"`
     Effect           string          `gorm:"index"`
-    Priority         int             `gorm:"index"`
     Enabled          bool            `gorm:"index;default:true"`
     Statement        JSONStatements  `gorm:"type:jsonb"`
 }
@@ -631,6 +630,7 @@ func (s *SecureService) GetUser(ctx context.Context, requestingUserID, targetUse
 - **[Resource Guide](docs/RESOURCE_GUIDE.md)** - Resource pattern documentation  
 - **[Condition Guide](docs/CONDITION_GUIDE.md)** - Condition operator reference
 - **[Hierarchical Resource Guide](docs/HIERARCHICAL_RESOURCE_GUIDE.md)** - Advanced hierarchical patterns
+- **[Policy Evaluation Algorithm](docs/POLICY_EVALUATION_ALGORITHM.md)** - Deny-Override algorithm explained
 
 ## 🛠️ Development
 
@@ -684,7 +684,7 @@ case constants.OpStringCustomMatch:
 - Policies stored in PostgreSQL `policies` table
 - Support for policy versioning via `version` field
 - Enable/disable policies with `enabled` flag
-- Priority-based evaluation order
+- Deny-Override evaluation algorithm (Deny always wins)
 
 ## 📊 Monitoring & Metrics
 
