@@ -314,9 +314,9 @@ func TestLogPolicyChange(t *testing.T) {
 	policyID := "pol-001"
 	changedBy := "admin-001"
 	changes := map[string]interface{}{
-		"field":     "priority",
-		"old_value": 100,
-		"new_value": 50,
+		"field":     "enabled",
+		"old_value": true,
+		"new_value": false,
 	}
 
 	err = logger.LogPolicyChange(changeType, policyID, changedBy, changes)
@@ -365,8 +365,8 @@ func TestLogPolicyChange(t *testing.T) {
 		changesMap := contextChanges.(map[string]interface{})
 		if field, exists := changesMap["field"]; !exists {
 			t.Error("Changes should contain field")
-		} else if field != "priority" {
-			t.Errorf("Expected field priority, got %s", field)
+		} else if field != "enabled" {
+			t.Errorf("Expected field enabled, got %s", field)
 		}
 	}
 }

@@ -434,7 +434,6 @@ Similar pattern như `GetAllSubjects`
       "policy_name": "Engineering Read Access",
       "description": "Allow engineering team to read technical resources",
       "effect": "permit",
-      "priority": 100,
       "enabled": true,
       "version": 1,
       "rules": [

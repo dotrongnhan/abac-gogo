@@ -311,8 +311,8 @@ func (a *AuditLogger) LogPolicyChange(changeType string, policyID string, change
     "change_type": "policy_updated",
     "changed_by": "admin-001",
     "changes": {
-      "priority": {"old": 100, "new": 50},
-      "enabled": {"old": false, "new": true}
+      "enabled": {"old": false, "new": true},
+      "description": {"old": "Old description", "new": "New description"}
     }
   },
   "created_at": "2024-01-15T14:30:00Z"
